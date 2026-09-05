@@ -21,17 +21,21 @@
           <button type="button" id="modeUnlimitedBtn" aria-pressed="false">Unlimited</button>
           <button type="button" id="modeCustomBtn" aria-pressed="false">Custom</button>
         </div>
-        <select id="difficultyPicker" class="difficulty-picker" aria-label="Unlimited mode difficulty" hidden>
-          <option value="any">Any difficulty</option>
-          <option value="easy">Easy</option>
-          <option value="medium">Medium</option>
-          <option value="hard">Hard</option>
-        </select>
-        <button type="button" class="btn btn-primary" id="newGameBtn">New Game</button>
-        <button type="button" class="icon-btn" id="statsBtn" title="Statistics" aria-label="Statistics">📊</button>
-        <button type="button" class="icon-btn" id="howToBtn" title="How to play" aria-label="How to play">?</button>
-        <button type="button" class="icon-btn" id="soundBtn" title="Toggle sound" aria-label="Toggle sound">🔊</button>
-        <button type="button" class="icon-btn" id="themeBtn" title="Toggle theme" aria-label="Toggle theme">◐</button>
+        <div class="primary-actions">
+          <select id="difficultyPicker" class="difficulty-picker" aria-label="Unlimited mode difficulty" hidden>
+            <option value="any">Any difficulty</option>
+            <option value="easy">Easy</option>
+            <option value="medium">Medium</option>
+            <option value="hard">Hard</option>
+          </select>
+          <button type="button" class="btn btn-primary" id="newGameBtn">New Game</button>
+        </div>
+        <div class="icon-buttons">
+          <button type="button" class="icon-btn" id="statsBtn" title="Statistics" aria-label="Statistics">📊</button>
+          <button type="button" class="icon-btn" id="howToBtn" title="How to play" aria-label="How to play">?</button>
+          <button type="button" class="icon-btn" id="soundBtn" title="Toggle sound" aria-label="Toggle sound">🔊</button>
+          <button type="button" class="icon-btn" id="themeBtn" title="Toggle theme" aria-label="Toggle theme">◐</button>
+        </div>
       </div>
     </header>
 
@@ -62,7 +66,7 @@
             type="text"
             id="countryInput"
             class="move-input"
-            placeholder="Enter any country on the route…"
+            placeholder="Enter a country…"
             autocomplete="off"
             aria-label="Next country"
           />

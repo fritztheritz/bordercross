@@ -1,0 +1,115 @@
+// Bordercross — connection graph + shortest-path logic
+//
+// The graph is built once from data.js and is the single source of truth
+// both for validating a player's moves and for computing the "optimal"
+// route — so the two can never disagree.
+
+import { COUNTRIES, LAND_EDGES, SEA_EDGES } from "./data.js";
+
+export const COUNTRY_BY_CODE = new Map(COUNTRIES.map((c) => [c[0], c]));
+
+function haversineKm(a, b) {
+  const [, , lat1, lon1] = a;
+  const [, , lat2, lon2] = b;
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const s =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(s));
+}
+
+function addEdge(map, a, b, type) {
+  if (!map.has(a)) map.set(a, new Map());
+  if (!map.has(b)) map.set(b, new Map());
+  if (!map.get(a).has(b)) map.get(a).set(b, type);
+  if (!map.get(b).has(a)) map.get(b).set(a, type);
+}
+
+/**
+ * Builds the adjacency graph: Map<code, Map<neighborCode, "land"|"sea">>.
+ * Guarantees every country has at least one edge: any country left with
+ * zero connections after land + curated sea edges are applied is linked
+ * to its single geographically nearest neighbor (a documented, fixed
+ * fallback rule — not a way to silently connect everything to everything).
+ */
+export function buildGraph() {
+  const graph = new Map();
+  for (const [code] of COUNTRIES) graph.set(code, new Map());
+
+  for (const [a, b] of LAND_EDGES) addEdge(graph, a, b, "land");
+  for (const [a, b] of SEA_EDGES) addEdge(graph, a, b, "sea");
+
+  for (const country of COUNTRIES) {
+    const code = country[0];
+    if (graph.get(code).size > 0) continue;
+    let nearest = null;
+    let nearestDist = Infinity;
+    for (const other of COUNTRIES) {
+      if (other[0] === code) continue;
+      const d = haversineKm(country, other);
+      if (d < nearestDist) {
+        nearestDist = d;
+        nearest = other[0];
+      }
+    }
+    if (nearest) addEdge(graph, code, nearest, "sea");
+  }
+
+  return graph;
+}
+
+/** Breadth-first shortest path. Returns an array of codes, or null. */
+export function bfsPath(graph, start, end) {
+  if (start === end) return [start];
+  const prev = new Map([[start, null]]);
+  const queue = [start];
+  let head = 0;
+  while (head < queue.length) {
+    const current = queue[head++];
+    if (current === end) break;
+    for (const neighbor of graph.get(current).keys()) {
+      if (!prev.has(neighbor)) {
+        prev.set(neighbor, current);
+        queue.push(neighbor);
+      }
+    }
+  }
+  if (!prev.has(end)) return null;
+  const path = [];
+  let node = end;
+  while (node !== null) {
+    path.unshift(node);
+    node = prev.get(node);
+  }
+  return path;
+}
+
+/** Breadth-first distances from `start` to every reachable country. */
+export function bfsDistances(graph, start) {
+  const dist = new Map([[start, 0]]);
+  const queue = [start];
+  let head = 0;
+  while (head < queue.length) {
+    const current = queue[head++];
+    for (const neighbor of graph.get(current).keys()) {
+      if (!dist.has(neighbor)) {
+        dist.set(neighbor, dist.get(current) + 1);
+        queue.push(neighbor);
+      }
+    }
+  }
+  return dist;
+}
+
+export function connectionType(graph, a, b) {
+  const edges = graph.get(a);
+  return edges ? edges.get(b) ?? null : null;
+}
+
+export function difficultyFor(optimalMoves) {
+  if (optimalMoves <= 3) return "Easy";
+  if (optimalMoves <= 6) return "Medium";
+  return "Hard";
+}

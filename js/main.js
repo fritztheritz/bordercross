@@ -23,6 +23,8 @@ import {
   saveDailyState,
 } from "./daily.js";
 import { buildShareText, shareResult } from "./share.js";
+import { soundEnabled, setSoundEnabled, playFound, playWrong, playWin } from "./sound.js";
+import { burstConfetti } from "./confetti.js";
 import {
   renderTicket,
   renderRouteChain,
@@ -30,6 +32,7 @@ import {
   clearFeedback,
   attachAutocomplete,
   renderStats,
+  renderMoveDistribution,
   renderResult,
   renderWrongGuesses,
 } from "./ui.js";
@@ -55,15 +58,19 @@ const els = {
   modeClassicBtn: document.getElementById("modeClassicBtn"),
   modeUnlimitedBtn: document.getElementById("modeUnlimitedBtn"),
   modeCustomBtn: document.getElementById("modeCustomBtn"),
+  difficultyPicker: document.getElementById("difficultyPicker"),
   newGameBtn: document.getElementById("newGameBtn"),
   statsBtn: document.getElementById("statsBtn"),
   howToBtn: document.getElementById("howToBtn"),
+  soundBtn: document.getElementById("soundBtn"),
   themeBtn: document.getElementById("themeBtn"),
   statsGrid: document.getElementById("statsGrid"),
+  moveDistribution: document.getElementById("moveDistribution"),
   resetStatsBtn: document.getElementById("resetStatsBtn"),
   resultHeadline: document.getElementById("resultHeadline"),
   resultBody: document.getElementById("resultBody"),
   dailyNextNote: document.getElementById("dailyNextNote"),
+  confettiLayer: document.getElementById("confettiLayer"),
   shareBtn: document.getElementById("shareBtn"),
   playAgainBtn: document.getElementById("playAgainBtn"),
   customStartInput: document.getElementById("customStartInput"),
@@ -139,6 +146,45 @@ els.themeBtn.addEventListener("click", () => {
   const next = THEME_CYCLE[(THEME_CYCLE.indexOf(current) + 1) % THEME_CYCLE.length];
   applyTheme(next);
 });
+
+// ---------- Sound ----------
+
+function syncSoundButton() {
+  els.soundBtn.textContent = soundEnabled() ? "🔊" : "🔇";
+}
+syncSoundButton();
+
+els.soundBtn.addEventListener("click", () => {
+  setSoundEnabled(!soundEnabled());
+  syncSoundButton();
+});
+
+// ---------- Unlimited mode difficulty ----------
+
+const DIFFICULTY_PICKER_KEY = "bordercross.unlimitedDifficulty";
+const DIFFICULTY_RANGES = {
+  any: { minMoves: 2, maxMoves: 14 },
+  easy: { minMoves: 2, maxMoves: 4 },
+  medium: { minMoves: 5, maxMoves: 9 },
+  hard: { minMoves: 10, maxMoves: 20 },
+};
+
+(function initDifficultyPicker() {
+  try {
+    const stored = localStorage.getItem(DIFFICULTY_PICKER_KEY);
+    if (stored && DIFFICULTY_RANGES[stored]) els.difficultyPicker.value = stored;
+  } catch {}
+})();
+
+els.difficultyPicker.addEventListener("change", () => {
+  try {
+    localStorage.setItem(DIFFICULTY_PICKER_KEY, els.difficultyPicker.value);
+  } catch {}
+});
+
+function unlimitedRange() {
+  return DIFFICULTY_RANGES[els.difficultyPicker.value] || DIFFICULTY_RANGES.any;
+}
 
 // ---------- Rendering the active game ----------
 
@@ -256,11 +302,12 @@ function setMode(next) {
   els.modeClassicBtn.setAttribute("aria-pressed", String(mode === "classic"));
   els.modeUnlimitedBtn.setAttribute("aria-pressed", String(mode === "unlimited"));
   els.modeCustomBtn.setAttribute("aria-pressed", String(mode === "custom"));
+  els.difficultyPicker.hidden = mode !== "unlimited";
 
   syncNewGameButton();
 
   if (mode === "unlimited" && !activeGame.startCode) {
-    const [start, dest] = randomPair(graph);
+    const [start, dest] = randomPair(graph, unlimitedRange());
     activeGame.start(start, dest);
   }
 
@@ -285,7 +332,7 @@ function openCustomPicker() {
 
 els.newGameBtn.addEventListener("click", () => {
   if (mode === "unlimited") {
-    const [start, dest] = randomPair(graph);
+    const [start, dest] = randomPair(graph, unlimitedRange());
     games.unlimited.start(start, dest);
     renderActiveGameView();
   } else if (mode === "custom") {
@@ -296,7 +343,7 @@ els.newGameBtn.addEventListener("click", () => {
 els.playAgainBtn.addEventListener("click", () => {
   closeModal("resultModal");
   if (mode === "unlimited") {
-    const [start, dest] = randomPair(graph);
+    const [start, dest] = randomPair(graph, unlimitedRange());
     games.unlimited.start(start, dest);
     renderActiveGameView();
   } else if (mode === "custom") {
@@ -313,6 +360,10 @@ function finishGame(result) {
   }
   recordResult(result);
   showResultModal(result);
+  if (result.status === "won") {
+    playWin(result.perfect);
+    burstConfetti(els.confettiLayer);
+  }
 }
 
 /** Used when restoring an already-completed daily puzzle — shows the same
@@ -388,6 +439,7 @@ function submitMove(rawValue) {
     } else if (result.reason === "already-found") {
       renderFeedback(els, `❌ You've already found ${activeGame.countryName(result.code)}.`, "err");
     } else if (result.reason === "not-on-path") {
+      playWrong();
       renderFeedback(
         els,
         `❌ ${activeGame.countryName(result.code)} isn't on the shortest route between ${activeGame.countryName(activeGame.startCode)} and ${activeGame.countryName(activeGame.destCode)}.`,
@@ -408,6 +460,7 @@ function submitMove(rawValue) {
     return;
   }
 
+  playFound();
   const tag = result.isNewSlot ? `${activeGame.slotCount - result.remaining}/${activeGame.slotCount} found` : "extra guess";
   const message = result.isNewSlot
     ? `✅ ${activeGame.countryName(result.code)} — confirmed on the route`
@@ -442,12 +495,16 @@ els.giveUpBtn.addEventListener("click", () => {
 // ---------- Stats ----------
 
 els.statsBtn.addEventListener("click", () => {
-  renderStats(els.statsGrid, loadStats(), loadStreakStats());
+  const stats = loadStats();
+  renderStats(els.statsGrid, stats, loadStreakStats());
+  renderMoveDistribution(els.moveDistribution, stats);
   openModal("statsModal");
 });
 els.resetStatsBtn.addEventListener("click", () => {
   if (!confirm("Reset all statistics? This can't be undone.")) return;
-  renderStats(els.statsGrid, resetStats(), loadStreakStats());
+  const stats = resetStats();
+  renderStats(els.statsGrid, stats, loadStreakStats());
+  renderMoveDistribution(els.moveDistribution, stats);
 });
 els.howToBtn.addEventListener("click", () => openModal("howToModal"));
 
@@ -486,6 +543,7 @@ function beginCustomChallenge() {
   els.modeClassicBtn.setAttribute("aria-pressed", "false");
   els.modeUnlimitedBtn.setAttribute("aria-pressed", "false");
   els.modeCustomBtn.setAttribute("aria-pressed", "true");
+  els.difficultyPicker.hidden = true;
   syncNewGameButton();
   renderActiveGameView();
   if (activeGame.status !== "playing") showCompletedResult(activeGame.result());

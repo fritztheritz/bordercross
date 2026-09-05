@@ -21,9 +21,16 @@
           <button type="button" id="modeUnlimitedBtn" aria-pressed="false">Unlimited</button>
           <button type="button" id="modeCustomBtn" aria-pressed="false">Custom</button>
         </div>
+        <select id="difficultyPicker" class="difficulty-picker" aria-label="Unlimited mode difficulty" hidden>
+          <option value="any">Any difficulty</option>
+          <option value="easy">Easy</option>
+          <option value="medium">Medium</option>
+          <option value="hard">Hard</option>
+        </select>
         <button type="button" class="btn btn-primary" id="newGameBtn">New Game</button>
         <button type="button" class="icon-btn" id="statsBtn" title="Statistics" aria-label="Statistics">📊</button>
         <button type="button" class="icon-btn" id="howToBtn" title="How to play" aria-label="How to play">?</button>
+        <button type="button" class="icon-btn" id="soundBtn" title="Toggle sound" aria-label="Toggle sound">🔊</button>
         <button type="button" class="icon-btn" id="themeBtn" title="Toggle theme" aria-label="Toggle theme">◐</button>
       </div>
     </header>
@@ -112,7 +119,7 @@
 
       <div class="rule-block land">
         <div class="rule-title">Game modes</div>
-        <p class="muted"><strong>Classic</strong> is a daily challenge — one fixed start/destination pair, the same for everyone, that refreshes at midnight in your local timezone. <strong>Unlimited</strong> generates a fresh random pair every time you press New Game. <strong>Custom</strong> lets you pick both countries yourself.</p>
+        <p class="muted"><strong>Classic</strong> is a daily challenge — one fixed start/destination pair, the same for everyone, that refreshes at midnight in your local timezone. <strong>Unlimited</strong> generates a fresh random pair every time you press New Game, and lets you pick a target difficulty from the dropdown next to the mode switcher. <strong>Custom</strong> lets you pick both countries yourself.</p>
       </div>
       <p class="muted">After finishing a run, <strong>Share Result</strong> copies (or opens your share sheet with) a spoiler-free summary — flags, move count, and a row of squares, no country names — so you can compare with friends over text.</p>
     </div>
@@ -125,6 +132,10 @@
       <h2 id="statsTitle">Statistics</h2>
       <p class="muted">Stored locally on this device.</p>
       <div class="stats-grid" id="statsGrid"></div>
+      <div class="dist-section">
+        <div class="dist-title">Move Distribution (Wins)</div>
+        <div id="moveDistribution"></div>
+      </div>
       <div class="modal-actions">
         <button type="button" class="btn btn-ghost" id="resetStatsBtn">Reset statistics</button>
       </div>
@@ -159,6 +170,7 @@
   <!-- Result -->
   <div class="modal-backdrop" id="resultModal" hidden>
     <div class="modal" role="dialog" aria-modal="true" aria-labelledby="resultTitle">
+      <div class="confetti-layer" id="confettiLayer" aria-hidden="true"></div>
       <div class="modal-close-row"><button class="icon-btn" data-close="resultModal" aria-label="Close">✕</button></div>
       <h2 class="result-headline" id="resultHeadline">🎉 You made it!</h2>
       <div id="resultBody"></div>

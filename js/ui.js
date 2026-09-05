@@ -3,7 +3,9 @@
 
 import { flagEmoji, searchCountries } from "./lookup.js";
 import { difficultyFor } from "./graph.js";
-import { averageMoves, averageEfficiency, formatTime } from "./stats.js";
+import { averageMoves, averageEfficiency, formatTime, DISTRIBUTION_BUCKETS } from "./stats.js";
+
+const DISTRIBUTION_LABELS = { "0": "Perfect", "1": "+1", "2": "+2", "3": "+3", "4+": "+4 or more" };
 
 export function renderTicket(els, { startEntry, destEntry, optimalMoves }) {
   els.startFlag.textContent = flagEmoji(startEntry[0]);
@@ -180,6 +182,40 @@ export function renderStats(grid, stats, streak) {
     tile.innerHTML = `<div class="stat-value mono">${value}</div><div class="stat-label">${label}</div>`;
     grid.appendChild(tile);
   }
+}
+
+/** Horizontal bar chart of extra-moves-beyond-optimal across wins — the
+ * most recently completed game's bucket is highlighted, Wordle-style. */
+export function renderMoveDistribution(container, stats) {
+  container.innerHTML = "";
+  const counts = DISTRIBUTION_BUCKETS.map((b) => stats.moveDistribution?.[b] || 0);
+  const total = counts.reduce((a, b) => a + b, 0);
+
+  if (total === 0) {
+    const empty = document.createElement("p");
+    empty.className = "muted dist-empty";
+    empty.textContent = "Win a few rounds to see your move distribution here.";
+    container.appendChild(empty);
+    return;
+  }
+
+  const max = Math.max(...counts);
+  DISTRIBUTION_BUCKETS.forEach((bucket, i) => {
+    const count = counts[i];
+    const isCurrent = stats.lastBucket === bucket;
+    const widthPct = count === 0 ? 0 : Math.max(8, (count / max) * 100);
+
+    const row = document.createElement("div");
+    row.className = "dist-row";
+    row.innerHTML = `
+      <span class="dist-label">${DISTRIBUTION_LABELS[bucket]}</span>
+      <span class="dist-bar-track">
+        <span class="dist-bar${isCurrent ? " dist-bar-current" : ""}" style="width:${widthPct}%"></span>
+      </span>
+      <span class="dist-count mono">${count}</span>
+    `;
+    container.appendChild(row);
+  });
 }
 
 export function renderResult(els, game, result) {

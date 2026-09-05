@@ -99,6 +99,8 @@ js/stats.js          localStorage-backed player statistics
 js/map.js            Leaflet route-map rendering (pan/zoom, no political borders)
 js/daily.js          Deterministic daily puzzle (seeded PRNG) + its localStorage persistence
 js/share.js          Wordle-style spoiler-free share text + native share/clipboard
+js/sound.js          Synthesized sound effects (Web Audio API, no assets)
+js/confetti.js       CSS-only confetti burst for winning
 js/ui.js             DOM rendering helpers
 js/main.js           Event wiring / bootstrapping (three Game instances, one per mode)
 ```
@@ -172,9 +174,11 @@ never loses progress in the other two.
   and result again rather than a fresh attempt — the same one-per-day
   model as Wordle.
 - **Unlimited** — a fresh random start/destination pair every time you
-  press New Game (biased toward a 2–14 move range so games stay
-  interesting), guaranteed solvable since the graph is fully connected.
-  This is what Classic mode did before the daily challenge existed.
+  press New Game, guaranteed solvable since the graph is fully connected.
+  This is what Classic mode did before the daily challenge existed. A
+  difficulty dropdown next to the mode switcher narrows the range
+  `randomPair()` draws from — Any (2–14 moves), Easy (2–4), Medium (5–9),
+  or Hard (10–20) — and the choice is remembered in `localStorage`.
 - **Custom** — pick your own start and destination.
 
 ## Sharing a result
@@ -232,3 +236,26 @@ touch it. Winning on the calendar day right after your last completed day
 extends the streak; missing a day, or giving up, resets it to 0. Shown in
 the result modal right after a Classic finish and as two tiles ("Daily
 streak" / "Best daily streak") in the Statistics panel.
+
+### Move distribution
+
+A Wordle-style horizontal bar chart in the Statistics panel, built from
+`stats.moveDistribution` — every win buckets its extra-moves-beyond-
+optimal into "Perfect", "+1", "+2", "+3", or "+4 or more" (that top bucket
+folds in everything beyond +4 so one wild game can't stretch the chart).
+The bucket from the most recently completed win is highlighted in gold,
+same idea as Wordle highlighting today's result in its own chart.
+
+## Sound and motion
+
+`js/sound.js` synthesizes a handful of short tones with the Web Audio
+API — a rising arpeggio on winning (longer for a perfect run), a soft
+tone on a correct find, a low buzz on a wrong guess — so there are no
+audio files to ship. A speaker icon in the topbar toggles sound on/off,
+remembered in `localStorage`.
+
+`js/confetti.js` bursts a couple dozen small falling pieces (plain CSS,
+no canvas or library) inside the result modal on a win; each piece
+removes itself when its own animation ends. Skipped entirely under
+`prefers-reduced-motion: reduce`, along with the modal's small pop-in
+animation on the score and headline.

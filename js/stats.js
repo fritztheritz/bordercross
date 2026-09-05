@@ -7,6 +7,15 @@
 const STORAGE_KEY = "bordercross.stats.v1";
 const STREAK_KEY = "bordercross.streak.v1";
 
+// Buckets extra moves beyond optimal for the distribution chart — "0" is
+// a perfect run, "4+" folds in everything from 4 extra moves up so a
+// single wild game can't stretch the chart indefinitely.
+export const DISTRIBUTION_BUCKETS = ["0", "1", "2", "3", "4+"];
+
+function emptyDistribution() {
+  return Object.fromEntries(DISTRIBUTION_BUCKETS.map((b) => [b, 0]));
+}
+
 function emptyStats() {
   return {
     gamesPlayed: 0,
@@ -19,7 +28,13 @@ function emptyStats() {
     perfectRoutes: 0,
     longestRouteCompleted: 0,
     fastestTimeMs: null,
+    moveDistribution: emptyDistribution(),
+    lastBucket: null,
   };
+}
+
+export function distributionBucket(extraMoves) {
+  return extraMoves >= 4 ? "4+" : String(extraMoves);
 }
 
 function emptyStreak() {
@@ -30,7 +45,12 @@ export function loadStats() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return emptyStats();
-    return { ...emptyStats(), ...JSON.parse(raw) };
+    const parsed = JSON.parse(raw);
+    return {
+      ...emptyStats(),
+      ...parsed,
+      moveDistribution: { ...emptyDistribution(), ...(parsed.moveDistribution || {}) },
+    };
   } catch {
     return emptyStats();
   }
@@ -57,6 +77,9 @@ export function recordResult(result) {
     stats.totalEfficiency += result.efficiency;
     if (result.perfect) stats.perfectRoutes += 1;
     stats.longestRouteCompleted = Math.max(stats.longestRouteCompleted, result.playerMoves);
+    const bucket = distributionBucket(Math.max(0, result.playerMoves - result.optimalMoves));
+    stats.moveDistribution[bucket] = (stats.moveDistribution[bucket] || 0) + 1;
+    stats.lastBucket = bucket;
     if (result.timeMs != null) {
       stats.fastestTimeMs =
         stats.fastestTimeMs == null ? result.timeMs : Math.min(stats.fastestTimeMs, result.timeMs);

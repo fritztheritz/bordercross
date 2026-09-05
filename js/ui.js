@@ -226,15 +226,14 @@ export function renderResult(els, game, result) {
       .join("  →  ");
     els.resultBody.innerHTML = `
       <div class="result-route">${routeText}</div>
-      <div class="result-score-row">
-        <div class="result-score mono">${result.score}</div>
+      <div class="result-highlight-row">
+        <div class="result-highlight mono">${result.playerMoves}/${result.optimalMoves}</div>
         <div class="result-meta">
-          <span class="big mono">${result.playerMoves} / ${result.optimalMoves} moves</span>
-          <span class="muted mono">${result.efficiency}% efficiency</span>
+          <span class="big mono">${result.efficiency}% efficiency</span>
           ${result.perfect ? '<span class="perfect-tag">Perfect route</span>' : ""}
         </div>
       </div>
-      ${result.hintsUsed ? `<p class="muted">Hints used: ${result.hintsUsed} (−${result.hintsUsed * 15} pts)</p>` : ""}
+      ${result.hintsUsed ? `<p class="muted">Hints used: ${result.hintsUsed}</p>` : ""}
     `;
   } else {
     els.resultHeadline.textContent = "🏳️ Route revealed";

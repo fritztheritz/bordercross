@@ -393,11 +393,11 @@ function showResultModal(result) {
 
 els.shareBtn.addEventListener("click", async () => {
   if (!lastResult) return;
-  const text = buildShareText(activeGame, lastResult, {
+  const share = buildShareText(activeGame, lastResult, {
     puzzleNumber: mode === "classic" ? puzzleNumber(currentDailyKey) : null,
     url: location.origin + location.pathname,
   });
-  const outcome = await shareResult(text);
+  const outcome = await shareResult(share);
   if (outcome === "copied") {
     els.shareBtn.textContent = "Copied!";
     setTimeout(() => (els.shareBtn.textContent = "Share Result"), 1800);

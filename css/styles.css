@@ -755,7 +755,7 @@ button:focus-visible, input:focus-visible, .suggestion-item:focus-visible {
   word-break: break-word;
 }
 
-.result-score-row {
+.result-highlight-row {
   display: flex;
   align-items: baseline;
   gap: 16px;
@@ -763,7 +763,7 @@ button:focus-visible, input:focus-visible, .suggestion-item:focus-visible {
   margin: 16px 0;
 }
 
-.result-score {
+.result-highlight {
   font-family: "Fraunces", Georgia, serif;
   font-size: 44px;
   font-weight: 700;
@@ -775,7 +775,7 @@ button:focus-visible, input:focus-visible, .suggestion-item:focus-visible {
 }
 
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .result-score { color: var(--accent-ink); }
+  :root:not([data-theme="light"]) .result-highlight { color: var(--accent-ink); }
 }
 
 .result-meta { display: flex; flex-direction: column; gap: 2px; }
@@ -865,6 +865,6 @@ button:focus-visible, input:focus-visible, .suggestion-item:focus-visible {
     60% { transform: scale(1.06); opacity: 1; }
     100% { transform: scale(1); opacity: 1; }
   }
-  .result-score { animation: result-pop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+  .result-highlight { animation: result-pop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
   .result-headline { animation: result-pop 0.35s ease-out both; }
 }

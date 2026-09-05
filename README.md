@@ -200,9 +200,17 @@ number so people can compare the same day's puzzle:
 BorderCross #247 🇸🇬 → 🇧🇿
 🏆 Perfect — 8/8 moves
 🟩🟩🟩🟩🟩🟩🟩🟩
-Score: 100
 https://fritztheritz.github.io/bordercross/
 ```
+
+The clipboard copy actually writes two formats at once (`ClipboardItem`
+with both `text/plain` and `text/html`): plain text looks like the block
+above, with the link as its own trailing line, while the HTML version
+makes "BorderCross" itself the hyperlink instead — whichever a given
+paste target (Slack, Gmail, Notion, ...) supports wins. The native share
+sheet gets the link through the Web Share API's separate `url` field
+rather than appended text, since the OS/app already knows how to place
+that appropriately (and often renders a real link preview from it).
 
 ## The map
 

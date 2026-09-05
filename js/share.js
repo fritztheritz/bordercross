@@ -6,18 +6,24 @@
 
 import { flagEmoji } from "./lookup.js";
 
+function escapeHtml(str) {
+  return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
 /**
  * @param {import("./game.js").Game} game
  * @param {object} result - Game#result() output
  * @param {{ puzzleNumber?: number, url?: string }} [opts]
+ * @returns {{ text: string, html: string|null, url: string|null }}
+ *   `text` is plain (no link — the URL is a separate field so native share
+ *   sheets and clipboard fallbacks can each place it correctly). `html` is
+ *   the same content with "BorderCross" itself as the clickable link, for
+ *   pasting into rich-text targets (Slack, Gmail, Notion, ...).
  */
 export function buildShareText(game, result, opts = {}) {
   const start = flagEmoji(game.startCode);
   const dest = flagEmoji(game.destCode);
-  const header =
-    opts.puzzleNumber != null
-      ? `BorderCross #${opts.puzzleNumber} ${start} → ${dest}`
-      : `BorderCross ${start} → ${dest}`;
+  const headerRest = opts.puzzleNumber != null ? ` #${opts.puzzleNumber} ${start} → ${dest}` : ` ${start} → ${dest}`;
 
   let statusLine;
   let squares;
@@ -37,29 +43,50 @@ export function buildShareText(game, result, opts = {}) {
     squares = "🟩".repeat(found) + "⬛".repeat(game.slotCount - found);
   }
 
-  const scoreLine = result.status === "won" ? `Score: ${result.score}` : null;
+  const text = [`BorderCross${headerRest}`, statusLine, squares].join("\n");
+  const html = opts.url
+    ? [
+        `<a href="${escapeHtml(opts.url)}">BorderCross</a>${escapeHtml(headerRest)}`,
+        escapeHtml(statusLine),
+        escapeHtml(squares),
+      ].join("<br>")
+    : null;
 
-  return [header, statusLine, squares, scoreLine, opts.url].filter(Boolean).join("\n");
+  return { text, html, url: opts.url || null };
 }
 
 /**
  * Shares via the native share sheet when available (mobile — lets the
  * player send straight to Messages, exactly like Wordle), falling back to
- * clipboard copy on desktop.
+ * a clipboard copy on desktop. The clipboard copy writes both a plain-text
+ * version (URL appended as a trailing line, since plain text can't carry a
+ * real link) and a rich-text version (the "BorderCross" wordmark itself is
+ * the hyperlink) — whichever the paste target supports wins.
+ * @param {{ text: string, html: string|null, url: string|null }} share
  * @returns {Promise<"shared"|"copied"|"cancelled"|"failed">}
  */
-export async function shareResult(text) {
+export async function shareResult({ text, html, url }) {
   if (navigator.share) {
     try {
-      await navigator.share({ text });
+      await navigator.share(url ? { text, url } : { text });
       return "shared";
     } catch (err) {
       if (err && err.name === "AbortError") return "cancelled";
       // Fall through to clipboard on any other share failure.
     }
   }
+
+  const plainWithUrl = url ? `${text}\n${url}` : text;
   try {
-    await navigator.clipboard.writeText(text);
+    if (html && window.ClipboardItem && navigator.clipboard.write) {
+      const item = new ClipboardItem({
+        "text/plain": new Blob([plainWithUrl], { type: "text/plain" }),
+        "text/html": new Blob([html], { type: "text/html" }),
+      });
+      await navigator.clipboard.write([item]);
+      return "copied";
+    }
+    await navigator.clipboard.writeText(plainWithUrl);
     return "copied";
   } catch {
     return "failed";

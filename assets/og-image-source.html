@@ -1,0 +1,59 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,700&family=Manrope:wght@500;700&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 1200px; height: 630px; overflow: hidden; }
+  body {
+    background: #12181f;
+    font-family: "Manrope", sans-serif;
+    position: relative;
+  }
+  .graticule {
+    position: absolute; inset: 0;
+    background-image:
+      repeating-linear-gradient(0deg, transparent, transparent 62px, rgba(234,236,229,0.05) 63px),
+      repeating-linear-gradient(90deg, transparent, transparent 62px, rgba(234,236,229,0.05) 63px);
+  }
+  .content { position: relative; padding: 72px 80px; height: 100%; display: flex; flex-direction: column; justify-content: center; }
+  .lockup { display: flex; align-items: center; gap: 24px; }
+  .lockup svg { flex-shrink: 0; }
+  .wordmark { font-family: "Fraunces", Georgia, serif; font-weight: 700; font-size: 76px; color: #eaece5; letter-spacing: -0.01em; }
+  .tagline { margin-top: 22px; font-size: 28px; color: #9caaa2; font-weight: 500; max-width: 780px; }
+  .route { margin-top: 44px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .chip { display: inline-flex; align-items: center; gap: 8px; padding: 10px 20px; border-radius: 999px; font-weight: 700; font-size: 21px; }
+  .chip.start { border: 1.5px solid #2b8c82; color: #2b8c82; }
+  .chip.mid { border: 1.5px solid rgba(234,236,229,0.28); color: #eaece5; }
+  .chip.end { border: 1.5px solid #3e9b6f; background: rgba(62,155,111,0.14); color: #3e9b6f; }
+  .arrow { color: #9caaa2; font-size: 20px; }
+  .footer { position: absolute; bottom: 44px; left: 80px; font-family: "IBM Plex Mono", monospace; font-size: 20px; color: #6b7871; letter-spacing: 0.02em; }
+</style>
+</head>
+<body>
+  <div class="graticule"></div>
+  <div class="content">
+    <div class="lockup">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="108" height="108">
+        <rect x="2" y="2" width="60" height="60" rx="18" fill="#1e2730"/>
+        <path d="M19 45 Q33 33 45 19" fill="none" stroke="#d9a441" stroke-width="4.5" stroke-linecap="round"/>
+        <circle cx="19" cy="45" r="9" fill="#2b8c82" stroke="#1e2730" stroke-width="2"/>
+        <circle cx="45" cy="19" r="9" fill="#3e9b6f" stroke="#1e2730" stroke-width="2"/>
+      </svg>
+      <span class="wordmark">BorderCross</span>
+    </div>
+    <div class="tagline">Name every country on the shortest route between two others — guessed in any order, against the clock of a daily puzzle.</div>
+    <div class="route">
+      <span class="chip start">🇨🇦 Canada</span>
+      <span class="arrow">→</span>
+      <span class="chip mid">🇺🇸 United States</span>
+      <span class="arrow">→</span>
+      <span class="chip mid">🇲🇽 Mexico</span>
+      <span class="arrow">→</span>
+      <span class="chip end">🇬🇹 Guatemala</span>
+    </div>
+  </div>
+  <div class="footer">fritztheritz.github.io/bordercross</div>
+</body>
+</html>

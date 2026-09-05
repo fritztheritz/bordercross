@@ -105,7 +105,9 @@ js/sound.js          Synthesized sound effects (Web Audio API, no assets)
 js/confetti.js       CSS-only confetti burst for winning
 js/ui.js             DOM rendering helpers
 js/main.js           Event wiring / bootstrapping (three Game instances, one per mode)
-assets/              Logo/favicon SVGs (see "Brand assets" below)
+assets/              Logo, favicon, and PWA/social-preview images (see "Brand assets" below)
+manifest.json        Web app manifest (installable/PWA)
+sw.js                Service worker — offline app-shell caching
 ```
 
 Each layer only talks to the ones below it, so e.g. the scoring formula in
@@ -275,3 +277,35 @@ arrival — literally the game's own map-marker colors (`js/map.js`).
 | `logo-icon.svg` | Square mark on its own dark badge. Used as the site favicon and next to the wordmark in the header. |
 | `logo-icon-mono.svg` | Same mark, no badge, `currentColor` fill/stroke — for inlining (not `<img>`, which can't see page CSS) anywhere a single flat color is needed. |
 | `logo-lockup.svg` / `logo-lockup-dark.svg` | Icon + "BorderCross" wordmark (real text, not outlined — `Fraunces` if the viewer has it loaded, `Georgia` otherwise) for light/dark banners. |
+| `logo-icon-maskable.svg` | Same mark, full-bleed square (no rounded corners or margin baked in) — source for the maskable PWA icon and the Apple touch icon, both of which apply their own shape/corner treatment and need edge-to-edge art to avoid it clipping. |
+| `icon-192.png` / `icon-512.png` / `icon-maskable-512.png` / `apple-touch-icon.png` | Rasterized from the two icon SVGs above (via a headless-browser screenshot, not an image generator) for `manifest.json` and iOS home-screen icons — see below. |
+| `og-image.png` (+ `og-image-source.html`) | The link-preview image (see "Sharing a link preview" below). The source HTML is kept so the image can be regenerated if the copy or design changes. |
+
+## Sharing a link preview
+
+`index.html`'s `<head>` carries Open Graph and Twitter Card meta tags
+pointing at `assets/og-image.png` (1200×630, the standard size), so
+pasting the site's URL into iMessage, Slack, Discord, or Twitter shows an
+actual preview card — the logo, the tagline, and a real example route —
+instead of a bare link. The image was built as an HTML page
+(`assets/og-image-source.html`) and rendered to PNG with a headless
+browser at the exact target size, the same way the PWA icons were, rather
+than through an image-generation tool.
+
+## Installing it (PWA)
+
+`manifest.json` and `sw.js` (registered from `index.html`) make the site
+installable — "Add to Home Screen" on mobile, or the install icon in a
+desktop browser's address bar. Once installed (or even just visited
+once), the service worker caches the app shell — everything the core
+game logic needs (`js/*.js`, `css/styles.css`, the icons) — with a
+stale-while-revalidate strategy: cached files serve instantly and work
+offline, while a background fetch keeps the cache current for next time.
+
+The route map is the one thing that doesn't work offline: Leaflet, the
+web fonts, and the Esri basemap tiles are all cross-origin and
+deliberately left uncached (`sw.js`'s fetch handler only intercepts
+same-origin requests), so they simply fail to load without a connection
+rather than serving something stale. Verified by loading the app once
+online, then reloading fully offline (Chrome DevTools network throttling)
+and confirming a full guess-and-score round trip still works.

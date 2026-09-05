@@ -353,6 +353,48 @@ button:focus-visible, input:focus-visible, .suggestion-item:focus-visible {
   .icon-btn { width: 42px; height: 42px; }
 }
 
+/* ---------- Restrictions ---------- */
+
+.restrictions-banner {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  background: color-mix(in srgb, var(--danger) 8%, var(--surface-raised));
+  border: 1px solid color-mix(in srgb, var(--danger) 32%, var(--hairline-strong));
+  border-radius: 12px;
+  padding: 12px 18px;
+}
+
+/* `.restrictions-banner`'s own `display: flex` ties in specificity with the
+   browser default `[hidden] { display: none }` — and author styles win
+   ties over the UA stylesheet, so without this the banner would show
+   (empty) even when the `hidden` attribute is set. */
+.restrictions-banner[hidden] { display: none; }
+
+.restrictions-label {
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--danger);
+  white-space: nowrap;
+}
+
+.restrictions-list { display: inline-flex; flex-wrap: wrap; gap: 8px; }
+
+.restriction-chip {
+  font-size: 13px;
+  font-weight: 700;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--danger) 14%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--danger) 35%, var(--hairline-strong));
+  color: var(--danger);
+  text-decoration: line-through;
+  text-decoration-color: color-mix(in srgb, var(--danger) 60%, transparent);
+}
+
 .panel {
   background: var(--surface-raised);
   border: 1px solid var(--hairline);
@@ -757,21 +799,35 @@ button:focus-visible, input:focus-visible, .suggestion-item:focus-visible {
 
 .result-highlight-row {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 16px;
   flex-wrap: wrap;
   margin: 16px 0;
 }
 
 .result-highlight {
-  font-family: "Fraunces", Georgia, serif;
-  font-size: 44px;
-  font-weight: 700;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   color: var(--accent-ink);
   background: var(--accent);
   border-radius: 12px;
-  padding: 6px 18px;
-  line-height: 1.2;
+  padding: 8px 20px;
+  line-height: 1.15;
+}
+
+.result-highlight-number {
+  font-family: "Fraunces", Georgia, serif;
+  font-size: 44px;
+  font-weight: 700;
+}
+
+.result-highlight-label {
+  font-size: 10.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  opacity: 0.75;
 }
 
 @media (prefers-color-scheme: dark) {

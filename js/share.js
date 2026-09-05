@@ -26,30 +26,31 @@ export function buildShareText(game, result, opts = {}) {
   const headerRest = opts.puzzleNumber != null ? ` #${opts.puzzleNumber} ${start} → ${dest}` : ` ${start} → ${dest}`;
 
   let statusLine;
-  let squares;
-
   if (result.status === "won") {
     statusLine = result.perfect
-      ? `🏆 Perfect — ${result.playerMoves}/${result.optimalMoves} moves`
-      : `${result.playerMoves}/${result.optimalMoves} moves (${result.efficiency}% efficiency)`;
-    const extra = Math.max(0, result.playerMoves - result.optimalMoves);
-    squares = "🟩".repeat(result.optimalMoves) + "🟨".repeat(extra);
+      ? `🏆 Perfect — ${result.playerMoves} move${result.playerMoves === 1 ? "" : "s"}`
+      : `${result.playerMoves} moves (optimal: ${result.optimalMoves}, ${result.efficiency}% efficiency)`;
     if (result.hintsUsed) {
       statusLine += ` · ${result.hintsUsed} hint${result.hintsUsed === 1 ? "" : "s"}`;
     }
   } else {
     const found = game.slotsFilled;
     statusLine = `🏳️ Gave up — found ${found}/${game.slotCount}`;
-    squares = "🟩".repeat(found) + "⬛".repeat(game.slotCount - found);
+  }
+  // Ordered to match the actual guesses: a wrong or redundant guess shows
+  // up exactly where it happened, not lumped at the end.
+  const squares = game.shareSquares();
+
+  const lines = [`BorderCross${headerRest}`, statusLine, squares];
+  if (game.restrictedCodes && game.restrictedCodes.size > 0) {
+    lines.push(`🚫 ${game.restrictedCodes.size} country${game.restrictedCodes.size === 1 ? "" : "ies"} off-limits`);
   }
 
-  const text = [`BorderCross${headerRest}`, statusLine, squares].join("\n");
+  const text = lines.join("\n");
   const html = opts.url
-    ? [
-        `<a href="${escapeHtml(opts.url)}">BorderCross</a>${escapeHtml(headerRest)}`,
-        escapeHtml(statusLine),
-        escapeHtml(squares),
-      ].join("<br>")
+    ? [`<a href="${escapeHtml(opts.url)}">BorderCross</a>${escapeHtml(headerRest)}`, ...lines.slice(1).map(escapeHtml)].join(
+        "<br>"
+      )
     : null;
 
   return { text, html, url: opts.url || null };

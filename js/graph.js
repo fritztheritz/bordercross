@@ -103,6 +103,23 @@ export function bfsDistances(graph, start) {
   return dist;
 }
 
+/** Returns a copy of `graph` with `excludedCodes` (and every edge touching
+ * them) removed — the basis for "restricted" challenges, where a shortest
+ * path has to route around a handful of off-limits countries. */
+export function graphExcluding(graph, excludedCodes) {
+  const excluded = new Set(excludedCodes);
+  const filtered = new Map();
+  for (const [code, edges] of graph) {
+    if (excluded.has(code)) continue;
+    const filteredEdges = new Map();
+    for (const [neighbor, type] of edges) {
+      if (!excluded.has(neighbor)) filteredEdges.set(neighbor, type);
+    }
+    filtered.set(code, filteredEdges);
+  }
+  return filtered;
+}
+
 export function connectionType(graph, a, b) {
   const edges = graph.get(a);
   return edges ? edges.get(b) ?? null : null;

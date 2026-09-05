@@ -84,6 +84,11 @@
       </div>
     </section>
 
+    <div class="restrictions-banner" id="restrictionsBanner" hidden>
+      <span class="restrictions-label">🚫 Off-limits for this route:</span>
+      <span class="restrictions-list" id="restrictionsList"></span>
+    </div>
+
     <section class="main-grid">
       <div class="panel console">
         <div class="route-chain" id="routeChain" aria-live="polite"></div>
@@ -148,9 +153,14 @@
       <p>The optimal number of steps is shown before you start, but the countries themselves never are, until you find them (or <strong>Give Up</strong> to reveal the route).</p>
       <p class="muted">Hints cost points: a hint reveals which region the earliest still-unfound step is in (e.g. "Southeast Asia") — a real clue, but not the country itself. Any country you guess that turns out to be wrong stays listed under "Ruled out" so you don't waste a second guess on it.</p>
 
+      <div class="rule-block sea">
+        <div class="rule-title">Restrictions</div>
+        <p class="muted">Some short-to-medium runs in Classic and Unlimited come with one or two countries banned from the route entirely — shown up front as "🚫 Off-limits for this route," never a surprise. The optimal route already routes around them, so the move count and every hint account for the detour. Restrictions are chosen from countries that actually sat on the direct route, so they always force a real reroute rather than banning somewhere irrelevant — and only on routes short enough that the detour is something you can actually reason about, not a random blocker dropped on an already-sprawling path.</p>
+      </div>
+
       <div class="rule-block land">
         <div class="rule-title">Game modes</div>
-        <p class="muted"><strong>Classic</strong> is a daily challenge — one fixed start/destination pair, the same for everyone, that refreshes at midnight in your local timezone. <strong>Unlimited</strong> generates a fresh random pair every time you press New Game, and lets you pick a target difficulty from the dropdown next to the mode switcher. <strong>Custom</strong> lets you pick both countries yourself.</p>
+        <p class="muted"><strong>Classic</strong> is a daily challenge — one fixed start/destination pair, the same for everyone, that refreshes at midnight in your local timezone. <strong>Unlimited</strong> generates a fresh random pair every time you press New Game, and lets you pick a target difficulty from the dropdown next to the mode switcher. <strong>Custom</strong> lets you pick both countries yourself — Custom runs never have restrictions, since you're already choosing the challenge.</p>
       </div>
       <p class="muted">After finishing a run, <strong>Share Result</strong> copies (or opens your share sheet with) a spoiler-free summary — flags, move count, and a row of squares, no country names — so you can compare with friends over text.</p>
     </div>

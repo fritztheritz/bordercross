@@ -9,7 +9,7 @@
 //   - custom:    the player picks both countries
 
 import { buildGraph, COUNTRY_BY_CODE } from "./graph.js";
-import { Game, randomPair } from "./game.js";
+import { Game, randomPair, pickRestrictions } from "./game.js";
 import { RouteMap } from "./map.js";
 import { resolveCountry } from "./lookup.js";
 import { loadStats, recordResult, resetStats, recordDailyOutcome, loadStreakStats } from "./stats.js";
@@ -19,6 +19,7 @@ import {
   msUntilNextMidnight,
   formatCountdown,
   dailyPair,
+  dailyRestrictions,
   loadDailyState,
   saveDailyState,
 } from "./daily.js";
@@ -35,6 +36,7 @@ import {
   renderMoveDistribution,
   renderResult,
   renderWrongGuesses,
+  renderRestrictions,
 } from "./ui.js";
 
 const els = {
@@ -54,6 +56,8 @@ const els = {
   giveUpBtn: document.getElementById("giveUpBtn"),
   hintLog: document.getElementById("hintLog"),
   wrongGuesses: document.getElementById("wrongGuesses"),
+  restrictionsBanner: document.getElementById("restrictionsBanner"),
+  restrictionsList: document.getElementById("restrictionsList"),
   mapContainer: document.getElementById("mapContainer"),
   modeClassicBtn: document.getElementById("modeClassicBtn"),
   modeUnlimitedBtn: document.getElementById("modeUnlimitedBtn"),
@@ -186,6 +190,14 @@ function unlimitedRange() {
   return DIFFICULTY_RANGES[els.difficultyPicker.value] || DIFFICULTY_RANGES.any;
 }
 
+/** Generates a fresh Unlimited pair and starts it, rolling the same
+ * chance of restrictions the daily challenge gets (just unseeded). */
+function startNewUnlimitedGame() {
+  const [start, dest] = randomPair(graph, unlimitedRange());
+  const restrictedCodes = pickRestrictions(graph, start, dest);
+  games.unlimited.start(start, dest, { restrictedCodes });
+}
+
 // ---------- Rendering the active game ----------
 
 function renderActiveGameView() {
@@ -199,6 +211,7 @@ function renderActiveGameView() {
 
   renderRouteChain(els, activeGame);
   renderWrongGuesses(els, activeGame);
+  renderRestrictions(els, activeGame);
   clearFeedback(els);
   els.hintLog.textContent = "";
   els.countryInput.value = "";
@@ -219,9 +232,11 @@ function serializeGame(g) {
   return {
     startCode: g.startCode,
     destCode: g.destCode,
+    restrictedCodes: [...g.restrictedCodes],
     slots: g.slots,
     guessedCodes: [...g.guessedCodes],
     wrongGuesses: [...g.wrongGuesses],
+    guessLog: g.guessLog,
     totalMoves: g.totalMoves,
     hintsUsed: g.hintsUsed,
     status: g.status,
@@ -231,10 +246,12 @@ function serializeGame(g) {
 }
 
 function restoreGame(g, saved) {
-  g.start(saved.startCode, saved.destCode); // deterministic: same pair, fresh distances
+  // deterministic: same pair + restrictions in, fresh distances recomputed
+  g.start(saved.startCode, saved.destCode, { restrictedCodes: saved.restrictedCodes || [] });
   g.slots = saved.slots.slice();
   g.guessedCodes = new Set(saved.guessedCodes);
   g.wrongGuesses = new Set(saved.wrongGuesses || []);
+  g.guessLog = saved.guessLog || [];
   g.totalMoves = saved.totalMoves ?? saved.acceptedGuesses ?? 0;
   g.hintsUsed = saved.hintsUsed;
   g.status = saved.status;
@@ -253,7 +270,8 @@ function loadDailyPuzzle() {
     restoreGame(games.classic, saved);
   } else {
     const [start, dest] = dailyPair(graph, currentDailyKey);
-    games.classic.start(start, dest);
+    const restrictedCodes = dailyRestrictions(graph, currentDailyKey, start, dest);
+    games.classic.start(start, dest, { restrictedCodes });
     persistDaily();
   }
 }
@@ -307,8 +325,7 @@ function setMode(next) {
   syncNewGameButton();
 
   if (mode === "unlimited" && !activeGame.startCode) {
-    const [start, dest] = randomPair(graph, unlimitedRange());
-    activeGame.start(start, dest);
+    startNewUnlimitedGame();
   }
 
   renderActiveGameView();
@@ -332,8 +349,7 @@ function openCustomPicker() {
 
 els.newGameBtn.addEventListener("click", () => {
   if (mode === "unlimited") {
-    const [start, dest] = randomPair(graph, unlimitedRange());
-    games.unlimited.start(start, dest);
+    startNewUnlimitedGame();
     renderActiveGameView();
   } else if (mode === "custom") {
     openCustomPicker();
@@ -343,8 +359,7 @@ els.newGameBtn.addEventListener("click", () => {
 els.playAgainBtn.addEventListener("click", () => {
   closeModal("resultModal");
   if (mode === "unlimited") {
-    const [start, dest] = randomPair(graph, unlimitedRange());
-    games.unlimited.start(start, dest);
+    startNewUnlimitedGame();
     renderActiveGameView();
   } else if (mode === "custom") {
     openCustomPicker();
@@ -438,6 +453,15 @@ function submitMove(rawValue) {
       );
     } else if (result.reason === "already-found") {
       renderFeedback(els, `❌ You've already found ${activeGame.countryName(result.code)}.`, "err");
+    } else if (result.reason === "restricted") {
+      playWrong();
+      renderFeedback(
+        els,
+        `❌ ${activeGame.countryName(result.code)} is off-limits for this route.`,
+        "err",
+        "counts as a move"
+      );
+      renderWrongGuesses(els, activeGame);
     } else if (result.reason === "not-on-path") {
       playWrong();
       renderFeedback(

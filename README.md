@@ -139,6 +139,12 @@ that doesn't resolve to any real country. Those aren't guesses *about the
 route* — they're just noise.
 
 Efficiency is reported as `optimal moves / player moves`, as a percentage.
+The result screen leads with the move count itself, not the score — a
+bare "10/8" reads ambiguously (which number is whose?), so the highlight
+box shows your move count with a "moves" label, and "Optimal: 8" sits
+next to it explicitly labeled. The score still exists (tracked for the
+"Best score" stat and the underlying formula above), it's just not the
+first thing you see anymore.
 
 ## Hints and wrong guesses
 
@@ -173,18 +179,47 @@ never loses progress in the other two.
   refreshes at midnight *in the player's own local timezone*. The pair is
   derived deterministically from the date string via a seeded PRNG
   (`dailyPair()`) — no server or fetch involved, so anyone opening the app
-  on the same day computes the same puzzle independently. Progress
-  persists across reloads via `localStorage` (keyed by date), and once
-  a day's puzzle is finished, reopening the app shows the completed board
-  and result again rather than a fresh attempt — the same one-per-day
-  model as Wordle.
+  on the same day computes the same puzzle independently. The day's
+  difficulty is drawn from a weighted mix — 25% Easy, 50% Medium, 25% Hard
+  — rather than a single fixed range, so most days feel substantial
+  without every day being a slog. Progress persists across reloads via
+  `localStorage` (keyed by date), and once a day's puzzle is finished,
+  reopening the app shows the completed board and result again rather
+  than a fresh attempt — the same one-per-day model as Wordle.
 - **Unlimited** — a fresh random start/destination pair every time you
   press New Game, guaranteed solvable since the graph is fully connected.
   This is what Classic mode did before the daily challenge existed. A
   difficulty dropdown next to the mode switcher narrows the range
   `randomPair()` draws from — Any (2–14 moves), Easy (2–4), Medium (5–9),
   or Hard (10–20) — and the choice is remembered in `localStorage`.
-- **Custom** — pick your own start and destination.
+- **Custom** — pick your own start and destination. Never gets
+  restrictions (see below) — you're already choosing the challenge.
+
+## Restrictions
+
+Classic and Unlimited runs have a 35% chance of banning one or two
+countries from the route entirely (`pickRestrictions()` in `js/game.js`)
+— shown up front as a "🚫 Off-limits for this route" banner, never sprung
+on the player mid-game. Every distance and path the run computes —
+`optimalMoves`, the hint targets, the eventual give-up reveal — runs
+against the graph with those countries (and every edge touching them)
+removed, via `graphExcluding()` in `js/graph.js`, so "optimal" always
+already accounts for the detour.
+
+Candidates are drawn only from the *unrestricted* shortest path's own
+intermediate countries, so a restriction always forces a real reroute
+rather than banning somewhere the route wouldn't have touched anyway —
+and only for base routes of 3–6 moves. A route that already spans
+continents (say, crossing the Bering Strait) is abstract enough on its
+own that banning one more country along it reads as an arbitrary blocker
+rather than a comprehensible detour; capping the eligible range keeps the
+twist to routes short enough that a player can actually reason about the
+alternative. If every attempt would blow the path up by more than 4 extra
+moves (some countries are load-bearing enough — Panama, say — that
+banning them makes "shortest" absurd), the run plays unrestricted instead.
+The daily challenge rolls its restrictions from a seed independent of the
+pair-selection one, so every player sees the same (or same lack of)
+restriction each day without the two draws perturbing each other.
 
 ## Sharing a result
 
@@ -198,10 +233,17 @@ number so people can compare the same day's puzzle:
 
 ```
 BorderCross #247 🇸🇬 → 🇧🇿
-🏆 Perfect — 8/8 moves
-🟩🟩🟩🟩🟩🟩🟩🟩
+7 moves (optimal: 4, 57% efficiency) · 1 hint
+🟨🟩🟩🟨🟩
+🚫 1 country off-limits
 https://fritztheritz.github.io/bordercross/
 ```
+
+The squares (`Game#shareSquares()`) follow the actual order guesses were
+made in, not the tally grouped at the end — a wrong or redundant guess
+(🟨) shows up exactly where it happened in the sequence, same as Wordle
+never reshuffles a guess row after the fact. A give-up run appends ⬛ for
+whichever required steps were never even attempted.
 
 The clipboard copy actually writes two formats at once (`ClipboardItem`
 with both `text/plain` and `text/html`): plain text looks like the block

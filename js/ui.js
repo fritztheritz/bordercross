@@ -97,6 +97,23 @@ export function renderWrongGuesses(els, game) {
   }
 }
 
+/** The countries this run bans the route from passing through at all —
+ * shown up front so the constraint is a puzzle element, not a surprise. */
+export function renderRestrictions(els, game) {
+  const restricted = game.restrictedCodes;
+  const hasRestrictions = restricted && restricted.size > 0;
+  els.restrictionsBanner.hidden = !hasRestrictions;
+  if (!hasRestrictions) return;
+
+  els.restrictionsList.innerHTML = "";
+  for (const code of restricted) {
+    const chip = document.createElement("span");
+    chip.className = "restriction-chip";
+    chip.textContent = `${flagEmoji(code)} ${game.countryName(code)}`;
+    els.restrictionsList.appendChild(chip);
+  }
+}
+
 /** Wires an input + suggestions box to live-filter countries. Returns
  * a controller with `.getSelection()` clearing on pick, and `.reset()`. */
 export function attachAutocomplete(input, box, { onSelect, excludeCodes = () => [] } = {}) {
@@ -218,6 +235,12 @@ export function renderMoveDistribution(container, stats) {
   });
 }
 
+function restrictionsRecap(game) {
+  if (!game.restrictedCodes || game.restrictedCodes.size === 0) return "";
+  const names = [...game.restrictedCodes].map((c) => `${flagEmoji(c)} ${game.countryName(c)}`).join(", ");
+  return `<p class="muted restrictions-recap">🚫 Off-limits this run: ${names}</p>`;
+}
+
 export function renderResult(els, game, result) {
   if (result.status === "won") {
     els.resultHeadline.textContent = result.perfect ? "🏆 Perfect route!" : "🎉 You made it!";
@@ -227,13 +250,18 @@ export function renderResult(els, game, result) {
     els.resultBody.innerHTML = `
       <div class="result-route">${routeText}</div>
       <div class="result-highlight-row">
-        <div class="result-highlight mono">${result.playerMoves}/${result.optimalMoves}</div>
+        <div class="result-highlight">
+          <div class="result-highlight-number mono">${result.playerMoves}</div>
+          <div class="result-highlight-label">move${result.playerMoves === 1 ? "" : "s"}</div>
+        </div>
         <div class="result-meta">
-          <span class="big mono">${result.efficiency}% efficiency</span>
+          <span class="big mono">Optimal: ${result.optimalMoves}</span>
+          <span class="muted mono">${result.efficiency}% efficiency</span>
           ${result.perfect ? '<span class="perfect-tag">Perfect route</span>' : ""}
         </div>
       </div>
       ${result.hintsUsed ? `<p class="muted">Hints used: ${result.hintsUsed}</p>` : ""}
+      ${restrictionsRecap(game)}
     `;
   } else {
     els.resultHeadline.textContent = "🏳️ Route revealed";
@@ -247,6 +275,7 @@ export function renderResult(els, game, result) {
       <p class="muted">Optimal route:</p>
       <div class="result-route">${optimalText}</div>
       <p class="mono">Optimal moves: ${result.optimalMoves}</p>
+      ${restrictionsRecap(game)}
     `;
   }
 }

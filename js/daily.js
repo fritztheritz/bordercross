@@ -8,12 +8,21 @@
 // destination independently.
 
 import { bfsDistances } from "./graph.js";
+import { pickRestrictions } from "./game.js";
 
 const STORAGE_PREFIX = "bordercross.daily.";
 const KEEP_DAYS = 30; // how much history to retain in localStorage
 
 // Day 1 of the daily challenge. Only used to number puzzles ("#1", "#2", ...).
 const EPOCH = "2026-01-01";
+
+// Weighted difficulty mix for the daily pick — skews toward Medium so most
+// days feel substantial without every day being a slog.
+const DIFFICULTY_TIERS = [
+  { minMoves: 2, maxMoves: 4, weight: 0.25 }, // Easy
+  { minMoves: 5, maxMoves: 9, weight: 0.5 }, // Medium
+  { minMoves: 10, maxMoves: 20, weight: 0.25 }, // Hard
+];
 
 function hashString(str) {
   let h = 0;
@@ -33,6 +42,16 @@ function mulberry32(seed) {
     t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
+}
+
+function pickTier(rng) {
+  const r = rng();
+  let cumulative = 0;
+  for (const tier of DIFFICULTY_TIERS) {
+    cumulative += tier.weight;
+    if (r < cumulative) return tier;
+  }
+  return DIFFICULTY_TIERS[DIFFICULTY_TIERS.length - 1];
 }
 
 /** Today's date key in the player's local timezone, e.g. "2026-09-05". */
@@ -65,9 +84,12 @@ export function formatCountdown(ms) {
 
 /** Deterministic (start, destination) pair for a given date key — every
  * player computing this for the same day gets the same puzzle. Mirrors
- * randomPair()'s candidate-range logic in game.js, but seeded. */
-export function dailyPair(graph, dateKey, { minMoves = 4, maxMoves = 9 } = {}) {
+ * randomPair()'s candidate-range logic in game.js, but seeded, and picks
+ * its move-count range from the weighted Easy/Medium/Hard mix above
+ * instead of one fixed range. */
+export function dailyPair(graph, dateKey) {
   const rng = mulberry32(hashString(dateKey));
+  const tier = pickTier(rng);
   const codes = [...graph.keys()].sort();
 
   for (let attempt = 0; attempt < 60; attempt++) {
@@ -75,7 +97,7 @@ export function dailyPair(graph, dateKey, { minMoves = 4, maxMoves = 9 } = {}) {
     const distances = bfsDistances(graph, start);
     const candidates = codes.filter((c) => {
       const d = distances.get(c);
-      return d !== undefined && d >= minMoves && d <= maxMoves;
+      return d !== undefined && d >= tier.minMoves && d <= tier.maxMoves;
     });
     if (candidates.length > 0) {
       const dest = candidates[Math.floor(rng() * candidates.length)];
@@ -89,6 +111,15 @@ export function dailyPair(graph, dateKey, { minMoves = 4, maxMoves = 9 } = {}) {
   const reachable = codes.filter((c) => c !== start && distances.has(c));
   const dest = reachable[Math.floor(rng() * reachable.length)];
   return [start, dest];
+}
+
+/** Deterministic restrictions for the day's pair — seeded independently of
+ * dailyPair() (a different hash input) so tweaking one never perturbs the
+ * other's random sequence. Same 35% chance / up to 2 countries as any
+ * other mode; see pickRestrictions() in game.js for the actual rule. */
+export function dailyRestrictions(graph, dateKey, startCode, destCode) {
+  const rng = mulberry32(hashString(dateKey + ":restrictions"));
+  return pickRestrictions(graph, startCode, destCode, rng);
 }
 
 export function loadDailyState(dateKey) {

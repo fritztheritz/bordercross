@@ -106,7 +106,7 @@ js/sound.js          Synthesized sound effects (Web Audio API, no assets)
 js/confetti.js       CSS-only confetti burst for winning
 js/ui.js             DOM rendering helpers
 js/main.js           Event wiring / bootstrapping (three Game instances, one per mode)
-assets/              Logo, favicon, and PWA/social-preview images (see "Brand assets" below)
+assets/              Logo, favicon, PWA/social-preview images, and flag icons (see "Brand assets" and "Flags" below)
 manifest.json        Web app manifest (installable/PWA)
 sw.js                Service worker — offline app-shell caching
 ```
@@ -362,6 +362,29 @@ no canvas or library) inside the result modal on a win; each piece
 removes itself when its own animation ends. Skipped entirely under
 `prefers-reduced-motion: reduce`, along with the modal's small pop-in
 animation on the score and headline.
+
+## Flags
+
+Every place a country's flag shows up — the ticket header, route chips,
+autocomplete suggestions, results — renders a self-hosted SVG from
+`assets/flags/` (one file per ISO 3166-1 alpha-2 code, from the
+MIT-licensed [flag-icons](https://github.com/lipis/flag-icons) project;
+see `assets/flags/LICENSE`) rather than a Unicode flag emoji.
+
+That's a deliberate choice, not a style preference: Windows' built-in
+emoji font (Segoe UI Emoji) ships no flag glyphs at all — a Microsoft
+policy decision, reportedly to sidestep taking a position on politically
+contested flags — so a flag emoji renders as plain regional-indicator
+letters (e.g. "CA") on Windows instead of a picture. SVGs sidestep that
+entirely, and hosting them locally means they also work offline via the
+service worker instead of depending on a CDN staying up.
+
+The one place flags are still plain-text Unicode emoji (`flagEmoji()` in
+`js/lookup.js`) is share results (`js/share.js`) — a native share sheet or
+clipboard paste is plain text, so there's no way to embed an image there.
+Windows users sharing a result will still see letters instead of flags in
+that one spot; that's an inherent limit of text-based sharing, not
+something fixable in-app.
 
 ## Brand assets
 

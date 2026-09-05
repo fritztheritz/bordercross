@@ -30,6 +30,35 @@ export function flagEmoji(code) {
     .replace(/./g, (c) => String.fromCodePoint(127397 + c.charCodeAt(0)));
 }
 
+// On-screen flags are rendered as self-hosted SVGs (assets/flags/, from the
+// MIT-licensed flag-icons project) rather than the Unicode emoji above.
+// Windows' built-in emoji font ships no flag glyphs at all (a deliberate
+// Microsoft policy choice around contested national flags) — Windows
+// players would otherwise see raw regional-indicator letters instead of a
+// flag. flagEmoji() itself is kept only for plain-text share results
+// (js/share.js), where an image isn't an option.
+
+function flagIconSrc(code) {
+  return `assets/flags/${code.toLowerCase()}.svg`;
+}
+
+/** An <img> element for a country's flag — for call sites building DOM
+ * nodes directly (e.g. via textContent-replacement patterns). */
+export function flagIconEl(code) {
+  const img = document.createElement("img");
+  img.className = "flag-icon";
+  img.src = flagIconSrc(code);
+  img.alt = "";
+  img.loading = "lazy";
+  img.decoding = "async";
+  return img;
+}
+
+/** The same flag, as an HTML string — for call sites building innerHTML. */
+export function flagIconHtml(code) {
+  return `<img class="flag-icon" src="${flagIconSrc(code)}" alt="" loading="lazy" decoding="async">`;
+}
+
 /** Exact match (name or alias, normalized) -> country entry, or null. */
 export function resolveCountry(input) {
   const q = normalize(input);

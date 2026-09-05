@@ -36,7 +36,7 @@ export class RouteMap {
     const L = window.L;
     this.map = L.map(container, {
       worldCopyJump: true,
-      minZoom: 2,
+      minZoom: 1,
       maxZoom: 7,
       zoomSnap: 0.5,
     }).setView([15, 10], 2);

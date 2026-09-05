@@ -1,7 +1,7 @@
 // BorderCross — DOM rendering helpers. Pure-ish: given state + elements,
 // update the page. Event wiring lives in main.js.
 
-import { flagEmoji, searchCountries } from "./lookup.js";
+import { flagIconEl, flagIconHtml, searchCountries } from "./lookup.js";
 import { difficultyFor } from "./graph.js";
 import { averageMoves, averageEfficiency, formatTime, DISTRIBUTION_BUCKETS } from "./stats.js";
 import { ACHIEVEMENTS } from "./achievements.js";
@@ -9,9 +9,9 @@ import { ACHIEVEMENTS } from "./achievements.js";
 const DISTRIBUTION_LABELS = { "0": "Perfect", "1": "+1", "2": "+2", "3": "+3", "4+": "+4 or more" };
 
 export function renderTicket(els, { startEntry, destEntry, optimalMoves }) {
-  els.startFlag.textContent = flagEmoji(startEntry[0]);
+  els.startFlag.replaceChildren(flagIconEl(startEntry[0]));
   els.startName.textContent = startEntry[1];
-  els.destFlag.textContent = flagEmoji(destEntry[0]);
+  els.destFlag.replaceChildren(flagIconEl(destEntry[0]));
   els.destName.textContent = destEntry[1];
 
   els.optimalMovesText.textContent = `${optimalMoves} move${optimalMoves === 1 ? "" : "s"} possible`;
@@ -43,13 +43,13 @@ export function renderRouteChain(els, game) {
 
     if (isDest) {
       chip.className = `chain-chip dest${game.status === "won" ? " reached" : ""}`;
-      chip.textContent = `${flagEmoji(code)} ${game.countryName(code)}`;
+      chip.append(flagIconEl(code), document.createTextNode(` ${game.countryName(code)}`));
     } else if (isStart) {
       chip.className = "chain-chip start";
-      chip.textContent = `${flagEmoji(code)} ${game.countryName(code)}`;
+      chip.append(flagIconEl(code), document.createTextNode(` ${game.countryName(code)}`));
     } else if (code != null) {
       chip.className = "chain-chip visited";
-      chip.textContent = `${flagEmoji(code)} ${game.countryName(code)}`;
+      chip.append(flagIconEl(code), document.createTextNode(` ${game.countryName(code)}`));
     } else {
       chip.className = "chain-chip blank";
       chip.textContent = `· ${i} ·`;
@@ -93,7 +93,7 @@ export function renderWrongGuesses(els, game) {
   for (const code of game.wrongGuesses) {
     const chip = document.createElement("span");
     chip.className = "wrong-guess-chip";
-    chip.textContent = `${flagEmoji(code)} ${game.countryName(code)}`;
+    chip.append(flagIconEl(code), document.createTextNode(` ${game.countryName(code)}`));
     els.wrongGuesses.appendChild(chip);
   }
 }
@@ -110,7 +110,7 @@ export function renderRestrictions(els, game) {
   for (const code of restricted) {
     const chip = document.createElement("span");
     chip.className = "restriction-chip";
-    chip.textContent = `${flagEmoji(code)} ${game.countryName(code)}`;
+    chip.append(flagIconEl(code), document.createTextNode(` ${game.countryName(code)}`));
     els.restrictionsList.appendChild(chip);
   }
 }
@@ -134,7 +134,7 @@ export function attachAutocomplete(input, box, { onSelect, excludeCodes = () => 
       btn.type = "button";
       btn.className = "suggestion-item" + (i === activeIndex ? " active" : "");
       btn.setAttribute("role", "option");
-      btn.textContent = `${flagEmoji(country[0])} ${country[1]}`;
+      btn.append(flagIconEl(country[0]), document.createTextNode(` ${country[1]}`));
       btn.addEventListener("mousedown", (e) => {
         e.preventDefault();
         input.value = country[1];
@@ -281,7 +281,7 @@ export function renderNewAchievements(container, newlyUnlocked) {
 
 function restrictionsRecap(game) {
   if (!game.restrictedCodes || game.restrictedCodes.size === 0) return "";
-  const names = [...game.restrictedCodes].map((c) => `${flagEmoji(c)} ${game.countryName(c)}`).join(", ");
+  const names = [...game.restrictedCodes].map((c) => `${flagIconHtml(c)} ${game.countryName(c)}`).join(", ");
   return `<p class="muted restrictions-recap">🚫 Off-limits this run: ${names}</p>`;
 }
 
@@ -289,7 +289,7 @@ export function renderResult(els, game, result) {
   if (result.status === "won") {
     els.resultHeadline.textContent = result.perfect ? "🏆 Perfect route!" : "🎉 You made it!";
     const routeText = result.route
-      .map((c) => `${flagEmoji(c)} ${game.countryName(c)}`)
+      .map((c) => `${flagIconHtml(c)} ${game.countryName(c)}`)
       .join("  →  ");
     els.resultBody.innerHTML = `
       <div class="result-route">${routeText}</div>
@@ -309,9 +309,9 @@ export function renderResult(els, game, result) {
   } else {
     els.resultHeadline.textContent = "🏳️ Route revealed";
     const optimalText = result.optimalPath
-      .map((c) => `${flagEmoji(c)} ${game.countryName(c)}`)
+      .map((c) => `${flagIconHtml(c)} ${game.countryName(c)}`)
       .join("  →  ");
-    const yourText = result.route.map((c) => `${flagEmoji(c)} ${game.countryName(c)}`).join("  →  ");
+    const yourText = result.route.map((c) => `${flagIconHtml(c)} ${game.countryName(c)}`).join("  →  ");
     els.resultBody.innerHTML = `
       <p class="muted">Your route so far:</p>
       <div class="result-route">${yourText}</div>

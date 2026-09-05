@@ -256,6 +256,21 @@ button:focus-visible, input:focus-visible, .suggestion-item:focus-visible {
 
 .stub-flag { font-size: 1.25em; line-height: 1; }
 
+/* Self-hosted SVG flags (assets/flags/) instead of Unicode flag emoji —
+   see js/lookup.js for why. Sized in em so it scales with whatever text
+   it's sitting next to, wherever a flag shows up. */
+.flag-icon {
+  display: inline-block;
+  height: 0.85em;
+  width: auto;
+  vertical-align: -0.1em;
+  border-radius: 2px;
+  box-shadow: 0 0 0 1px var(--hairline-strong);
+  background: var(--surface);
+}
+
+.stub-flag .flag-icon { height: 1em; }
+
 .perforation {
   position: relative;
   width: 0;

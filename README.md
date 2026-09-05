@@ -2,7 +2,7 @@
 
 <img src="assets/logo-lockup.svg" alt="BorderCross" width="280">
 
-**Play it live: [fritztheritz.github.io/bordercross](https://fritztheritz.github.io/bordercross/)**
+**Play it live: [bordercross.io](https://bordercross.io/)**
 
 Given a starting country and a destination, name every country that sits
 on the shortest possible route between them — in any order.
@@ -284,7 +284,7 @@ BorderCross #247 🇸🇬 → 🇧🇿
 7 moves (optimal: 4) · 1 hint
 🟨🟩🟩🟨🟩
 🚫 Off-limits: 🇳🇬
-https://fritztheritz.github.io/bordercross/
+https://bordercross.io/
 ```
 
 The squares (`Game#shareSquares()`) follow the actual order guesses were

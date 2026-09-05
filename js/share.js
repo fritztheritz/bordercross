@@ -29,7 +29,7 @@ export function buildShareText(game, result, opts = {}) {
   if (result.status === "won") {
     statusLine = result.perfect
       ? `🏆 Perfect — ${result.playerMoves} move${result.playerMoves === 1 ? "" : "s"}`
-      : `${result.playerMoves} moves (optimal: ${result.optimalMoves}, ${result.efficiency}% efficiency)`;
+      : `${result.playerMoves} moves (optimal: ${result.optimalMoves})`;
     if (result.hintsUsed) {
       statusLine += ` · ${result.hintsUsed} hint${result.hintsUsed === 1 ? "" : "s"}`;
     }

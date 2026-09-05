@@ -836,7 +836,6 @@ button:focus-visible, input:focus-visible, .suggestion-item:focus-visible {
 
 .result-meta { display: flex; flex-direction: column; gap: 2px; }
 .result-meta .big { font-size: 18px; font-weight: 700; }
-.result-meta .muted { font-size: 12.5px; }
 
 .perfect-tag {
   display: inline-block;

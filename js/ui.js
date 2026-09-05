@@ -256,7 +256,6 @@ export function renderResult(els, game, result) {
         </div>
         <div class="result-meta">
           <span class="big mono">Optimal: ${result.optimalMoves}</span>
-          <span class="muted mono">${result.efficiency}% efficiency</span>
           ${result.perfect ? '<span class="perfect-tag">Perfect route</span>' : ""}
         </div>
       </div>

@@ -138,13 +138,16 @@ before every step is found, repeating a country already found, or a typo
 that doesn't resolve to any real country. Those aren't guesses *about the
 route* — they're just noise.
 
-Efficiency is reported as `optimal moves / player moves`, as a percentage.
-The result screen leads with the move count itself, not the score — a
-bare "10/8" reads ambiguously (which number is whose?), so the highlight
-box shows your move count with a "moves" label, and "Optimal: 8" sits
-next to it explicitly labeled. The score still exists (tracked for the
-"Best score" stat and the underlying formula above), it's just not the
-first thing you see anymore.
+Efficiency is reported as `optimal moves / player moves`, as a percentage
+— tracked in Statistics (`averageEfficiency()` in `js/stats.js`) but left
+out of the result screen and share text, which show only the move count:
+enough on its own without also spelling out the ratio as a percentage.
+The result screen leads with the move count itself, not the score either
+— a bare "10/8" reads ambiguously (which number is whose?), so the
+highlight box shows your move count with a "moves" label, and "Optimal:
+8" sits next to it explicitly labeled. The score still exists (tracked
+for the "Best score" stat and the underlying formula above), it's just
+not the first thing you see anymore.
 
 ## Hints and wrong guesses
 
@@ -233,7 +236,7 @@ number so people can compare the same day's puzzle:
 
 ```
 BorderCross #247 🇸🇬 → 🇧🇿
-7 moves (optimal: 4, 57% efficiency) · 1 hint
+7 moves (optimal: 4) · 1 hint
 🟨🟩🟩🟨🟩
 🚫 Off-limits: 🇳🇬
 https://fritztheritz.github.io/bordercross/

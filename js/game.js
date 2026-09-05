@@ -189,13 +189,18 @@ export class Game {
     return [this.startCode, ...this.slots, this.destCode];
   }
 
-  /** Ordered 🟩/🟨 (and, for a given-up run, trailing ⬛) squares built
-   * from the actual guess sequence — wrong/redundant guesses show up
-   * exactly where they happened, not lumped at the end. */
-  shareSquares() {
-    const squares = this.guessLog.map((entry) => (entry.result === "correct" || entry.result === "arrival" ? "🟩" : "🟨")).join("");
-    if (this.status === "won") return squares;
-    return squares + "⬛".repeat(this.slotCount - this.slotsFilled);
+  /** Ordered per-guess outcomes ("correct"|"wrong", plus a trailing "blank"
+   * for each unfound step on a given-up run) built from the actual guess
+   * sequence — a wrong or redundant guess shows up exactly where it
+   * happened, not lumped at the end. Kept as semantic outcomes rather than
+   * emoji so callers can render whichever palette fits (see share.js's
+   * colorblind-friendly option). */
+  guessOutcomes() {
+    const outcomes = this.guessLog.map((entry) =>
+      entry.result === "correct" || entry.result === "arrival" ? "correct" : "wrong"
+    );
+    if (this.status !== "won") outcomes.push(...Array(this.slotCount - this.slotsFilled).fill("blank"));
+    return outcomes;
   }
 
   result() {
@@ -228,9 +233,14 @@ export class Game {
   }
 }
 
-/** Picks a random (start, destination) pair with a "fun" difficulty range. */
-export function randomPair(graph, { minMoves = 2, maxMoves = 14 } = {}) {
-  const codes = [...graph.keys()];
+/** Picks a random (start, destination) pair with a "fun" difficulty range.
+ * `codePool`, if given, restricts *which countries can be picked* as start
+ * or destination (e.g. Unlimited's region filter) — the shortest path
+ * between them is still computed over the full graph, so a route can (and
+ * often will) pass through countries outside the pool on its way. */
+export function randomPair(graph, { minMoves = 2, maxMoves = 14, codePool = null } = {}) {
+  const allCodes = [...graph.keys()];
+  const codes = codePool && codePool.size > 0 ? allCodes.filter((c) => codePool.has(c)) : allCodes;
   for (let attempt = 0; attempt < 40; attempt++) {
     const start = codes[Math.floor(Math.random() * codes.length)];
     const distances = bfsDistances(graph, start);
@@ -243,8 +253,8 @@ export function randomPair(graph, { minMoves = 2, maxMoves = 14 } = {}) {
       return [start, dest];
     }
   }
-  // Fallback: any reachable pair at all (graph is fully connected, so this
-  // only triggers if the range above was pathologically narrow).
+  // Fallback: any reachable pair within the pool (graph is fully connected,
+  // so this only triggers if the range above was pathologically narrow).
   const start = codes[Math.floor(Math.random() * codes.length)];
   const distances = bfsDistances(graph, start);
   const reachable = codes.filter((c) => c !== start && distances.has(c));

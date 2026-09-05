@@ -130,3 +130,36 @@ export function difficultyFor(optimalMoves) {
   if (optimalMoves <= 9) return "Medium";
   return "Hard";
 }
+
+// Coarse practice-region groupings for Unlimited mode's region filter,
+// built from each country's finer `region` field (js/data.js) — which
+// stays granular (22 values, e.g. "Southeastern Europe") because that's
+// what makes a good hint. A dropdown wants far fewer, broader choices, so
+// they're bucketed here into one extra layer rather than exposing all 22.
+export const REGION_GROUPS = {
+  americas: { label: "Americas", regions: ["North America", "Central America", "Caribbean", "South America"] },
+  europe: {
+    label: "Europe",
+    regions: ["Northern Europe", "Southern Europe", "Western Europe", "Eastern Europe", "Southeastern Europe"],
+  },
+  middleEastCaucasus: { label: "Middle East & Caucasus", regions: ["Middle East", "Caucasus"] },
+  africa: {
+    label: "Africa",
+    regions: ["North Africa", "West Africa", "Central Africa", "East Africa", "Southern Africa", "Indian Ocean Islands"],
+  },
+  asia: { label: "Asia", regions: ["Central Asia", "South Asia", "East Asia", "Southeast Asia"] },
+  oceania: { label: "Oceania", regions: ["Oceania"] },
+};
+
+/** Country codes belonging to a REGION_GROUPS key, or null for an unknown
+ * key — callers treat null the same as "no filter". */
+export function codesInRegionGroup(groupKey) {
+  const group = REGION_GROUPS[groupKey];
+  if (!group) return null;
+  const regionSet = new Set(group.regions);
+  const codes = new Set();
+  for (const country of COUNTRIES) {
+    if (regionSet.has(country[4])) codes.add(country[0]);
+  }
+  return codes;
+}

@@ -12,6 +12,11 @@ const STREAK_KEY = "bordercross.streak.v1";
 // single wild game can't stretch the chart indefinitely.
 export const DISTRIBUTION_BUCKETS = ["0", "1", "2", "3", "4+"];
 
+// How many of the most recent wins the trend chart keeps around. Bounded so
+// the stats blob (and the chart itself) can't grow indefinitely for a
+// long-time player.
+export const TREND_HISTORY_LIMIT = 20;
+
 function emptyDistribution() {
   return Object.fromEntries(DISTRIBUTION_BUCKETS.map((b) => [b, 0]));
 }
@@ -30,6 +35,8 @@ function emptyStats() {
     fastestTimeMs: null,
     moveDistribution: emptyDistribution(),
     lastBucket: null,
+    exploredCodes: [], // every country that's appeared in a completed (won) route, ever
+    recentGames: [], // last TREND_HISTORY_LIMIT wins: { efficiency, ts } — oldest first, for the trend chart
   };
 }
 
@@ -84,6 +91,14 @@ export function recordResult(result) {
       stats.fastestTimeMs =
         stats.fastestTimeMs == null ? result.timeMs : Math.min(stats.fastestTimeMs, result.timeMs);
     }
+
+    const explored = new Set(stats.exploredCodes || []);
+    for (const code of result.route) explored.add(code);
+    stats.exploredCodes = [...explored];
+
+    stats.recentGames = [...(stats.recentGames || []), { efficiency: result.efficiency, ts: Date.now() }].slice(
+      -TREND_HISTORY_LIMIT
+    );
   } else {
     stats.gamesGivenUp += 1;
   }

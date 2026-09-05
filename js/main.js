@@ -8,7 +8,7 @@
 //                to be before the daily challenge)
 //   - custom:    the player picks both countries
 
-import { buildGraph, COUNTRY_BY_CODE } from "./graph.js";
+import { buildGraph, COUNTRY_BY_CODE, REGION_GROUPS, codesInRegionGroup } from "./graph.js";
 import { Game, randomPair, pickRestrictions } from "./game.js";
 import { RouteMap } from "./map.js";
 import { resolveCountry } from "./lookup.js";
@@ -22,6 +22,7 @@ import {
   dailyRestrictions,
   loadDailyState,
   saveDailyState,
+  addDays,
 } from "./daily.js";
 import { buildShareText, shareResult } from "./share.js";
 import { soundEnabled, setSoundEnabled, playFound, playWrong, playWin } from "./sound.js";
@@ -35,6 +36,7 @@ import {
   attachAutocomplete,
   renderStats,
   renderMoveDistribution,
+  renderTrendChart,
   renderResult,
   renderWrongGuesses,
   renderRestrictions,
@@ -67,6 +69,9 @@ const els = {
   modeCustomBtn: document.getElementById("modeCustomBtn"),
   difficultyPicker: document.getElementById("difficultyPicker"),
   restrictionsPicker: document.getElementById("restrictionsPicker"),
+  regionPicker: document.getElementById("regionPicker"),
+  catchUpBanner: document.getElementById("catchUpBanner"),
+  catchUpBtn: document.getElementById("catchUpBtn"),
   newGameBtn: document.getElementById("newGameBtn"),
   achievementsBtn: document.getElementById("achievementsBtn"),
   statsBtn: document.getElementById("statsBtn"),
@@ -75,6 +80,7 @@ const els = {
   themeBtn: document.getElementById("themeBtn"),
   statsGrid: document.getElementById("statsGrid"),
   moveDistribution: document.getElementById("moveDistribution"),
+  trendChart: document.getElementById("trendChart"),
   resetStatsBtn: document.getElementById("resetStatsBtn"),
   achievementsGrid: document.getElementById("achievementsGrid"),
   achievementsProgress: document.getElementById("achievementsProgress"),
@@ -83,6 +89,7 @@ const els = {
   dailyNextNote: document.getElementById("dailyNextNote"),
   confettiLayer: document.getElementById("confettiLayer"),
   shareBtn: document.getElementById("shareBtn"),
+  colorblindToggle: document.getElementById("colorblindToggle"),
   playAgainBtn: document.getElementById("playAgainBtn"),
   customStartInput: document.getElementById("customStartInput"),
   customDestInput: document.getElementById("customDestInput"),
@@ -109,23 +116,37 @@ let currentDailyKey = todayKey();
 
 // ---------- Modals ----------
 
+// Tracks whatever had focus right before a modal opened, so closing it
+// (✕, Escape, or a backdrop click) returns focus there instead of
+// stranding a keyboard/screen-reader user at the top of the document.
+let lastFocusedBeforeModal = null;
+
 function openModal(id) {
-  document.getElementById(id).hidden = false;
+  const modal = document.getElementById(id);
+  lastFocusedBeforeModal = document.activeElement;
+  modal.hidden = false;
+  // Move focus into the modal itself — the close button is always present
+  // and always a sensible first stop, so it doubles as the modal's focus
+  // target rather than hunting for the "most relevant" field.
+  modal.querySelector(".icon-btn[data-close]")?.focus();
 }
 function closeModal(id) {
   document.getElementById(id).hidden = true;
+  lastFocusedBeforeModal?.focus?.();
+  lastFocusedBeforeModal = null;
 }
 document.querySelectorAll("[data-close]").forEach((btn) => {
   btn.addEventListener("click", () => closeModal(btn.dataset.close));
 });
 document.querySelectorAll(".modal-backdrop").forEach((backdrop) => {
   backdrop.addEventListener("click", (e) => {
-    if (e.target === backdrop) backdrop.hidden = true;
+    if (e.target === backdrop) closeModal(backdrop.id);
   });
 });
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") {
-    document.querySelectorAll(".modal-backdrop").forEach((b) => (b.hidden = true));
+    const open = document.querySelector(".modal-backdrop:not([hidden])");
+    if (open) closeModal(open.id);
   }
 });
 
@@ -170,6 +191,26 @@ els.soundBtn.addEventListener("click", () => {
   syncSoundButton();
 });
 
+// ---------- Colorblind-friendly share squares ----------
+//
+// Lives right on the result modal (next to the button it actually affects)
+// rather than in the top bar, since it's a share-time preference — but it
+// still persists across sessions like every other setting here.
+
+const COLORBLIND_KEY = "bordercross.colorblindShare";
+
+(function initColorblindToggle() {
+  try {
+    els.colorblindToggle.checked = localStorage.getItem(COLORBLIND_KEY) === "1";
+  } catch {}
+})();
+
+els.colorblindToggle.addEventListener("change", () => {
+  try {
+    localStorage.setItem(COLORBLIND_KEY, els.colorblindToggle.checked ? "1" : "0");
+  } catch {}
+});
+
 // ---------- Unlimited mode difficulty ----------
 
 const DIFFICULTY_PICKER_KEY = "bordercross.unlimitedDifficulty";
@@ -212,6 +253,35 @@ els.restrictionsPicker.addEventListener("change", () => {
   } catch {}
 });
 
+const REGION_PICKER_KEY = "bordercross.unlimitedRegion";
+
+for (const [key, group] of Object.entries(REGION_GROUPS)) {
+  const opt = document.createElement("option");
+  opt.value = key;
+  opt.textContent = group.label;
+  els.regionPicker.appendChild(opt);
+}
+
+(function initRegionPicker() {
+  try {
+    const stored = localStorage.getItem(REGION_PICKER_KEY);
+    if (stored && (stored === "any" || REGION_GROUPS[stored])) els.regionPicker.value = stored;
+  } catch {}
+})();
+
+els.regionPicker.addEventListener("change", () => {
+  try {
+    localStorage.setItem(REGION_PICKER_KEY, els.regionPicker.value);
+  } catch {}
+});
+
+/** Country-code pool for Unlimited's region filter, or null for "any" —
+ * randomPair() treats null the same as no filter at all. */
+function unlimitedRegionCodes() {
+  const key = els.regionPicker.value;
+  return key && key !== "any" ? codesInRegionGroup(key) : null;
+}
+
 /** Generates a fresh Unlimited pair and starts it. Restrictions follow
  * the picker: "random" rolls the same chance the daily challenge gets
  * (just unseeded), "off" never applies one, and "on" retries with fresh
@@ -219,18 +289,19 @@ els.restrictionsPicker.addEventListener("change", () => {
  * own eligibility rules in game.js) rather than silently giving up. */
 function startNewUnlimitedGame() {
   const restrictionMode = els.restrictionsPicker.value;
+  const codePool = unlimitedRegionCodes();
   let start;
   let dest;
   let restrictedCodes = [];
 
   if (restrictionMode === "on") {
     for (let attempt = 0; attempt < 20; attempt++) {
-      [start, dest] = randomPair(graph, unlimitedRange());
+      [start, dest] = randomPair(graph, { ...unlimitedRange(), codePool });
       restrictedCodes = pickRestrictions(graph, start, dest, Math.random, { chance: 1 });
       if (restrictedCodes.length > 0) break;
     }
   } else {
-    [start, dest] = randomPair(graph, unlimitedRange());
+    [start, dest] = randomPair(graph, { ...unlimitedRange(), codePool });
     if (restrictionMode !== "off") restrictedCodes = pickRestrictions(graph, start, dest);
   }
 
@@ -247,6 +318,7 @@ function renderActiveGameView() {
   });
   els.dailyNumber.hidden = mode !== "classic";
   if (mode === "classic") els.dailyNumber.textContent = `Daily #${puzzleNumber(currentDailyKey)}`;
+  syncCatchUpBanner();
 
   renderRouteChain(els, activeGame);
   renderWrongGuesses(els, activeGame);
@@ -302,8 +374,12 @@ function persistDaily() {
   saveDailyState(currentDailyKey, serializeGame(games.classic));
 }
 
-function loadDailyPuzzle() {
-  currentDailyKey = todayKey();
+/** Loads (or generates) the Classic puzzle for `dateKey`, defaulting to
+ * today. Also used to "replay" a missed earlier day (see isReplayingPastDay
+ * below) — same puzzle, same persistence, same streak-recording, just
+ * pointed at a different date. */
+function loadDailyPuzzle(dateKey = todayKey()) {
+  currentDailyKey = dateKey;
   const saved = loadDailyState(currentDailyKey);
   if (saved && saved.startCode) {
     restoreGame(games.classic, saved);
@@ -314,6 +390,43 @@ function loadDailyPuzzle() {
     persistDaily();
   }
 }
+
+// ---------- Catch-up: replaying a missed day ----------
+//
+// True while Classic is showing an earlier day's puzzle instead of today's.
+// `mode` deliberately stays "classic" throughout — every existing
+// `mode === "classic"` check (persistence, streak recording, the daily
+// countdown note) keeps working unchanged, since they all key off
+// `currentDailyKey`, which this temporarily repoints at the earlier date.
+let isReplayingPastDay = false;
+
+/** Offered only for exactly yesterday, and only if it wasn't already
+ * finished — no open-ended archive browsing, so the "same puzzle for
+ * everyone" fairness Classic relies on stays intact for every other day. */
+function canReplayYesterday() {
+  const y = addDays(todayKey(), -1);
+  if (puzzleNumber(y) < 0) return false; // before the archive existed
+  const saved = loadDailyState(y);
+  return !saved || saved.status === "playing";
+}
+
+function syncCatchUpBanner() {
+  els.catchUpBanner.hidden = mode !== "classic" || isReplayingPastDay || !canReplayYesterday();
+}
+
+function returnToToday() {
+  isReplayingPastDay = false;
+  loadDailyPuzzle(todayKey());
+  renderActiveGameView();
+  if (activeGame.status !== "playing") showCompletedResult(activeGame.result());
+}
+
+els.catchUpBtn.addEventListener("click", () => {
+  isReplayingPastDay = true;
+  loadDailyPuzzle(addDays(todayKey(), -1));
+  renderActiveGameView();
+  if (activeGame.status !== "playing") showCompletedResult(activeGame.result());
+});
 
 function syncNewGameButton() {
   if (mode === "classic") {
@@ -328,7 +441,10 @@ function syncNewGameButton() {
 function startCountdown() {
   const tick = () => {
     const key = todayKey();
-    if (key !== currentDailyKey) {
+    // Skipped while replaying a missed day — currentDailyKey is
+    // *intentionally* not today then, and forcing it back would yank the
+    // player out of the puzzle they just chose to catch up on.
+    if (!isReplayingPastDay && key !== currentDailyKey) {
       loadDailyPuzzle();
       if (mode === "classic") {
         renderActiveGameView();
@@ -336,6 +452,7 @@ function startCountdown() {
       }
     }
     syncNewGameButton();
+    syncCatchUpBanner();
   };
   tick();
   setInterval(tick, 1000);
@@ -361,6 +478,7 @@ function setMode(next) {
   els.modeCustomBtn.setAttribute("aria-pressed", String(mode === "custom"));
   els.difficultyPicker.hidden = mode !== "unlimited";
   els.restrictionsPicker.hidden = mode !== "unlimited";
+  els.regionPicker.hidden = mode !== "unlimited";
 
   syncNewGameButton();
 
@@ -398,7 +516,9 @@ els.newGameBtn.addEventListener("click", () => {
 
 els.playAgainBtn.addEventListener("click", () => {
   closeModal("resultModal");
-  if (mode === "unlimited") {
+  if (isReplayingPastDay) {
+    returnToToday();
+  } else if (mode === "unlimited") {
     startNewUnlimitedGame();
     renderActiveGameView();
   } else if (mode === "custom") {
@@ -437,7 +557,8 @@ function showResultModal(result, newlyUnlocked = []) {
   els.hintBtn.disabled = true;
   els.giveUpBtn.disabled = true;
 
-  els.playAgainBtn.hidden = mode === "classic";
+  els.playAgainBtn.hidden = mode === "classic" && !isReplayingPastDay;
+  els.playAgainBtn.textContent = isReplayingPastDay ? "Back to Today" : "New Game";
   els.dailyNextNote.hidden = mode !== "classic";
   if (mode === "classic") {
     const streak = loadStreakStats();
@@ -449,11 +570,20 @@ function showResultModal(result, newlyUnlocked = []) {
   openModal("resultModal");
 }
 
+/** The base app URL for most shares, but a Custom-mode challenge link
+ * (?start=XX&dest=YY) for Custom — see tryStartChallengeFromUrl(). */
+function shareUrlFor() {
+  const base = location.origin + location.pathname;
+  if (mode !== "custom") return base;
+  return `${base}?start=${activeGame.startCode}&dest=${activeGame.destCode}`;
+}
+
 els.shareBtn.addEventListener("click", async () => {
   if (!lastResult) return;
   const share = buildShareText(activeGame, lastResult, {
     puzzleNumber: mode === "classic" ? puzzleNumber(currentDailyKey) : null,
-    url: location.origin + location.pathname,
+    url: shareUrlFor(),
+    colorblind: els.colorblindToggle.checked,
   });
   const outcome = await shareResult(share);
   if (outcome === "copied") {
@@ -565,6 +695,7 @@ els.statsBtn.addEventListener("click", () => {
   const stats = loadStats();
   renderStats(els.statsGrid, stats, loadStreakStats());
   renderMoveDistribution(els.moveDistribution, stats);
+  renderTrendChart(els.trendChart, stats);
   openModal("statsModal");
 });
 els.resetStatsBtn.addEventListener("click", () => {
@@ -573,6 +704,7 @@ els.resetStatsBtn.addEventListener("click", () => {
   resetAchievements();
   renderStats(els.statsGrid, stats, loadStreakStats());
   renderMoveDistribution(els.moveDistribution, stats);
+  renderTrendChart(els.trendChart, stats);
 });
 els.howToBtn.addEventListener("click", () => openModal("howToModal"));
 els.achievementsBtn.addEventListener("click", () => {
@@ -595,6 +727,23 @@ attachAutocomplete(els.customDestInput, els.customDestSuggestions, {
   },
 });
 
+/** Shared by the picker (beginCustomChallenge) and a challenge link opened
+ * from a friend's share (tryStartChallengeFromUrl) — whichever route got
+ * here, activating a Custom run looks the same. */
+function activateCustomGame(startCode, destCode) {
+  if (mode === "classic") persistDaily();
+  games.custom.start(startCode, destCode);
+  mode = "custom";
+  activeGame = games.custom;
+  els.modeClassicBtn.setAttribute("aria-pressed", "false");
+  els.modeUnlimitedBtn.setAttribute("aria-pressed", "false");
+  els.modeCustomBtn.setAttribute("aria-pressed", "true");
+  els.difficultyPicker.hidden = true;
+  els.restrictionsPicker.hidden = true;
+  els.regionPicker.hidden = true;
+  syncNewGameButton();
+}
+
 function beginCustomChallenge() {
   const start = customStartCountry || resolveCountry(els.customStartInput.value);
   const dest = customDestCountry || resolveCountry(els.customDestInput.value);
@@ -608,16 +757,7 @@ function beginCustomChallenge() {
     return;
   }
   closeModal("customModal");
-  if (mode === "classic") persistDaily();
-  games.custom.start(start[0], dest[0]);
-  mode = "custom";
-  activeGame = games.custom;
-  els.modeClassicBtn.setAttribute("aria-pressed", "false");
-  els.modeUnlimitedBtn.setAttribute("aria-pressed", "false");
-  els.modeCustomBtn.setAttribute("aria-pressed", "true");
-  els.difficultyPicker.hidden = true;
-  els.restrictionsPicker.hidden = true;
-  syncNewGameButton();
+  activateCustomGame(start[0], dest[0]);
   renderActiveGameView();
   if (activeGame.status !== "playing") showCompletedResult(activeGame.result());
 }
@@ -632,9 +772,26 @@ els.customStartBtn.addEventListener("click", beginCustomChallenge);
   });
 });
 
+/** A Custom-mode Share Result link encodes ?start=XX&dest=YY — opening it
+ * drops a friend straight into the same pair instead of them having to set
+ * it up themselves. Consumed once at boot; the query string is then
+ * stripped so it doesn't linger in the address bar or get re-triggered on
+ * a later reload/bookmark. */
+function tryStartChallengeFromUrl() {
+  const params = new URLSearchParams(location.search);
+  const start = (params.get("start") || "").toUpperCase();
+  const dest = (params.get("dest") || "").toUpperCase();
+  if (!start || !dest || start === dest || !graph.has(start) || !graph.has(dest)) return false;
+
+  activateCustomGame(start, dest);
+  history.replaceState(null, "", location.pathname);
+  return true;
+}
+
 // ---------- Boot ----------
 
 loadDailyPuzzle();
+tryStartChallengeFromUrl();
 renderActiveGameView();
-if (games.classic.status !== "playing") showCompletedResult(games.classic.result());
+if (activeGame.status !== "playing") showCompletedResult(activeGame.result());
 startCountdown();

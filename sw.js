@@ -11,7 +11,7 @@
 // available (instant load, works offline), then update the cache from the
 // network in the background so the *next* load picks up any change.
 
-const CACHE_NAME = "bordercross-shell-v1";
+const CACHE_NAME = "bordercross-shell-v2";
 
 const APP_SHELL = [
   "./",

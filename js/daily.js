@@ -41,7 +41,9 @@ function pairSetKey(a, b) {
   return [a, b].sort().join("|");
 }
 
-function addDays(dateKey, delta) {
+/** `dateKey` shifted by `delta` days (negative goes backward) — e.g.
+ * `addDays(todayKey(), -1)` for "yesterday". */
+export function addDays(dateKey, delta) {
   const [y, m, d] = dateKey.split("-").map(Number);
   const date = new Date(y, m - 1, d);
   date.setDate(date.getDate() + delta);

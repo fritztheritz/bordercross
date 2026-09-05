@@ -236,6 +236,54 @@ export function renderMoveDistribution(container, stats) {
   });
 }
 
+/** A small trend line of efficiency (optimal ÷ actual moves) across the
+ * player's most recent wins — oldest on the left, most recent on the
+ * right — so a returning player can see "am I getting better" at a
+ * glance, alongside the move-distribution chart above it. */
+export function renderTrendChart(container, stats) {
+  container.innerHTML = "";
+  const games = stats.recentGames || [];
+  if (games.length < 2) {
+    const empty = document.createElement("p");
+    empty.className = "muted dist-empty";
+    empty.textContent = "Win a few more rounds to see your efficiency trend here.";
+    container.appendChild(empty);
+    return;
+  }
+
+  const w = 280;
+  const h = 56;
+  const pad = 4;
+  const points = games
+    .map((g, i) => {
+      const x = pad + (i / (games.length - 1)) * (w - pad * 2);
+      const y = pad + (1 - g.efficiency / 100) * (h - pad * 2);
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    })
+    .join(" ");
+
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
+  svg.setAttribute("class", "trend-svg");
+  svg.setAttribute("preserveAspectRatio", "none");
+  svg.setAttribute("role", "img");
+  svg.setAttribute("aria-label", `Efficiency trend over your last ${games.length} wins`);
+  const polyline = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
+  polyline.setAttribute("points", points);
+  polyline.setAttribute("fill", "none");
+  polyline.setAttribute("stroke", "currentColor");
+  polyline.setAttribute("stroke-width", "2");
+  polyline.setAttribute("stroke-linecap", "round");
+  polyline.setAttribute("stroke-linejoin", "round");
+  svg.appendChild(polyline);
+  container.appendChild(svg);
+
+  const caption = document.createElement("p");
+  caption.className = "muted trend-caption";
+  caption.textContent = `Efficiency over your last ${games.length} win${games.length === 1 ? "" : "s"}`;
+  container.appendChild(caption);
+}
+
 /** Every achievement, unlocked ones in full color, locked ones dimmed but
  * still showing their icon/title/description — knowing what you're
  * working toward is more motivating than a mystery box. */

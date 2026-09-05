@@ -10,10 +10,25 @@ function escapeHtml(str) {
   return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
+// Default palette is already green/yellow/black rather than Wordle's
+// green/red — the pairing hardest to tell apart for red-green colorblindness
+// — but green vs. yellow can still be close for some viewers. The
+// colorblind-friendly alternate swaps in blue/orange, a pairing distinct
+// under every common form of color vision deficiency.
+const PALETTES = {
+  default: { correct: "🟩", wrong: "🟨", blank: "⬛" },
+  colorblind: { correct: "🟦", wrong: "🟧", blank: "⬛" },
+};
+
+function renderSquares(outcomes, colorblind) {
+  const palette = colorblind ? PALETTES.colorblind : PALETTES.default;
+  return outcomes.map((o) => palette[o]).join("");
+}
+
 /**
  * @param {import("./game.js").Game} game
  * @param {object} result - Game#result() output
- * @param {{ puzzleNumber?: number, url?: string }} [opts]
+ * @param {{ puzzleNumber?: number, url?: string, colorblind?: boolean }} [opts]
  * @returns {{ text: string, html: string|null, url: string|null }}
  *   `text` is plain (no link — the URL is a separate field so native share
  *   sheets and clipboard fallbacks can each place it correctly). `html` is
@@ -39,7 +54,7 @@ export function buildShareText(game, result, opts = {}) {
   }
   // Ordered to match the actual guesses: a wrong or redundant guess shows
   // up exactly where it happened, not lumped at the end.
-  const squares = game.shareSquares();
+  const squares = renderSquares(game.guessOutcomes(), opts.colorblind);
 
   const lines = [`BorderCross${headerRest}`, statusLine, squares];
   if (game.restrictedCodes && game.restrictedCodes.size > 0) {

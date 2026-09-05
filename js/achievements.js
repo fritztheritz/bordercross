@@ -92,6 +92,20 @@ export const ACHIEVEMENTS = [
     description: "Play 100 games.",
     check: ({ stats }) => stats.gamesPlayed >= 100,
   },
+  {
+    id: "explorer-50",
+    icon: "🧳",
+    title: "Explorer",
+    description: "Visit 50 different countries across completed routes.",
+    check: ({ stats }) => (stats.exploredCodes?.length ?? 0) >= 50,
+  },
+  {
+    id: "explorer-150",
+    icon: "🌐",
+    title: "Well-Traveled",
+    description: "Visit 150 different countries across completed routes.",
+    check: ({ stats }) => (stats.exploredCodes?.length ?? 0) >= 150,
+  },
 ];
 
 export function loadUnlocked() {

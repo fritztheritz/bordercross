@@ -60,6 +60,9 @@
             <option value="off">Restrictions: Off</option>
             <option value="on">Restrictions: On</option>
           </select>
+          <select id="regionPicker" class="difficulty-picker" aria-label="Unlimited mode region" hidden>
+            <option value="any">Any region</option>
+          </select>
           <button type="button" class="btn btn-primary" id="newGameBtn">New Game</button>
         </div>
         <div class="icon-buttons">
@@ -93,6 +96,11 @@
     <div class="restrictions-banner" id="restrictionsBanner" hidden>
       <span class="restrictions-label">🚫 Off-limits for this route:</span>
       <span class="restrictions-list" id="restrictionsList"></span>
+    </div>
+
+    <div class="catch-up-banner" id="catchUpBanner" hidden>
+      <span>🕓 You missed yesterday's puzzle.</span>
+      <button type="button" class="btn btn-ghost" id="catchUpBtn">Play it now</button>
     </div>
 
     <section class="main-grid">
@@ -166,9 +174,9 @@
 
       <div class="rule-block land">
         <div class="rule-title">Game modes</div>
-        <p class="muted"><strong>Classic</strong> is a daily challenge — one fixed start/destination pair, the same for everyone, that refreshes at midnight in your local timezone. <strong>Unlimited</strong> generates a fresh random pair every time you press New Game, and lets you pick a target difficulty and whether restrictions apply from the dropdowns next to the mode switcher. <strong>Custom</strong> lets you pick both countries yourself — Custom runs never have restrictions, since you're already choosing the challenge.</p>
+        <p class="muted"><strong>Classic</strong> is a daily challenge — one fixed start/destination pair, the same for everyone, that refreshes at midnight in your local timezone. If you miss a day, a banner offers to let you play it before today's, so a busy day doesn't have to break your streak. <strong>Unlimited</strong> generates a fresh random pair every time you press New Game, and lets you pick a target difficulty, whether restrictions apply, and a region to draw from, all from the dropdowns next to the mode switcher. <strong>Custom</strong> lets you pick both countries yourself — Custom runs never have restrictions, since you're already choosing the challenge, and sharing one gives a friend a link straight into the same pair.</p>
       </div>
-      <p class="muted">After finishing a run, <strong>Share Result</strong> copies (or opens your share sheet with) a spoiler-free summary — flags, move count, and a row of squares, no country names — so you can compare with friends over text.</p>
+      <p class="muted">After finishing a run, <strong>Share Result</strong> copies (or opens your share sheet with) a spoiler-free summary — flags, move count, and a row of squares, no country names — so you can compare with friends over text. A checkbox on the result modal swaps in colorblind-friendly squares if the default green/yellow pair is hard to tell apart.</p>
       <p class="muted">The 🏅 icon in the top bar tracks <strong>Achievements</strong> — small milestones unlocked from your stats and streak, like completing a Hard route with no hints or reaching a 7-day streak.</p>
     </div>
   </div>
@@ -183,6 +191,10 @@
       <div class="dist-section">
         <div class="dist-title">Move Distribution (Wins)</div>
         <div id="moveDistribution"></div>
+      </div>
+      <div class="dist-section">
+        <div class="dist-title">Efficiency Trend</div>
+        <div id="trendChart"></div>
       </div>
       <div class="modal-actions">
         <button type="button" class="btn btn-ghost" id="resetStatsBtn">Reset statistics</button>
@@ -233,6 +245,10 @@
       <h2 class="result-headline" id="resultHeadline">🎉 You made it!</h2>
       <div id="resultBody"></div>
       <p class="muted daily-next-note" id="dailyNextNote" hidden></p>
+      <label class="checkbox-row">
+        <input type="checkbox" id="colorblindToggle" />
+        <span>Colorblind-friendly share squares (🟦/🟧 instead of 🟩/🟨)</span>
+      </label>
       <div class="modal-actions">
         <button type="button" class="btn btn-primary" id="shareBtn">Share Result</button>
         <button type="button" class="btn" id="playAgainBtn">New Game</button>

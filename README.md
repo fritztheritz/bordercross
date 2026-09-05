@@ -194,7 +194,17 @@ never loses progress in the other two.
   no server round-trip. Progress persists across reloads via
   `localStorage` (keyed by date), and once a day's puzzle is finished,
   reopening the app shows the completed board and result again rather
-  than a fresh attempt — the same one-per-day model as Wordle.
+  than a fresh attempt — the same one-per-day model as Wordle. Puzzles are
+  numbered from a fixed epoch (`EPOCH` in `js/daily.js`) — "Daily #0" is
+  the archive's first day.
+
+  If you open the app and haven't finished *yesterday's* puzzle, a small
+  banner offers to let you play it before today's — recovering a missed
+  day (and keeping your streak alive) without turning Classic into an
+  open-ended archive anyone can browse. It only ever offers exactly
+  yesterday, and only while it's still unfinished; `mode` stays `"classic"`
+  the whole time (see `isReplayingPastDay` in `js/main.js`), so persistence
+  and streak-recording work exactly like any other day.
 - **Unlimited** — a fresh random start/destination pair every time you
   press New Game, guaranteed solvable since the graph is fully connected.
   This is what Classic mode did before the daily challenge existed. A
@@ -205,9 +215,18 @@ never loses progress in the other two.
   the usual chance-based roll described below — "Off" always plays
   unrestricted, "On" retries fresh pairs (up to 20 attempts) until one
   actually supports a restriction, and "Random" is the original 35%-chance
-  behavior. Also remembered in `localStorage`.
+  behavior. A third dropdown (Region) restricts *which countries can be
+  picked* as start or destination — Americas, Europe, Middle East &
+  Caucasus, Africa, Asia, or Oceania (`REGION_GROUPS` in `js/graph.js`,
+  grouped from each country's finer `region` field) — for practicing one
+  part of the world. The route itself still runs over the full graph, so
+  it can (and often does) pass through countries outside the pool on its
+  way. All three dropdowns are remembered in `localStorage`.
 - **Custom** — pick your own start and destination. Never gets
-  restrictions (see below) — you're already choosing the challenge.
+  restrictions (see below) — you're already choosing the challenge. A
+  finished Custom run's Share Result link encodes `?start=XX&dest=YY`, so
+  a friend who opens it lands in the exact same pair instead of setting
+  one up themselves (`tryStartChallengeFromUrl()` in `js/main.js`).
 
 ## Restrictions
 
@@ -237,7 +256,7 @@ restriction each day without the two draws perturbing each other.
 
 ## Achievements
 
-12 small unlockable milestones (`js/achievements.js`), tracked behind the
+14 small unlockable milestones (`js/achievements.js`), tracked behind the
 🏅 icon in the topbar. Each definition is just a `check(ctx)` predicate run
 against a snapshot of data that already exists — persisted stats, streak,
 the `Game` instance just finished, and its result — so unlocking never
@@ -257,6 +276,8 @@ requires any new gameplay tracking of its own:
 | 🔥 Creature of Habit | Reach a 30-day streak |
 | ✈️ Frequent Flyer | Play 25 games |
 | 🗺️ World Traveler | Play 100 games |
+| 🧳 Explorer | Visit 50 different countries across completed routes |
+| 🌐 Well-Traveled | Visit 150 different countries across completed routes |
 
 Unlocked ids persist in `localStorage`, independent of the stats they read
 from — resetting statistics also resets achievements, since most of the
@@ -287,20 +308,36 @@ BorderCross #247 🇸🇬 → 🇧🇿
 https://bordercross.io/
 ```
 
-The squares (`Game#shareSquares()`) follow the actual order guesses were
-made in, not the tally grouped at the end — a wrong or redundant guess
-(🟨) shows up exactly where it happened in the sequence, same as Wordle
-never reshuffles a guess row after the fact. A give-up run appends ⬛ for
-whichever required steps were never even attempted.
+The squares follow the actual order guesses were made in, not the tally
+grouped at the end — a wrong or redundant guess (🟨) shows up exactly
+where it happened in the sequence, same as Wordle never reshuffles a
+guess row after the fact. A give-up run appends ⬛ for whichever required
+steps were never even attempted. `Game#guessOutcomes()` returns these as
+semantic outcomes (`"correct"|"wrong"|"blank"`), not emoji — `js/share.js`
+does the actual emoji mapping, so it can swap in the colorblind-friendly
+palette (🟦/🟧 instead of 🟩/🟨, a checkbox right on the result modal,
+remembered in `localStorage`) without `Game` needing to know settings
+exist at all.
 
 The clipboard copy actually writes two formats at once (`ClipboardItem`
 with both `text/plain` and `text/html`): plain text looks like the block
 above, with the link as its own trailing line, while the HTML version
 makes "BorderCross" itself the hyperlink instead — whichever a given
-paste target (Slack, Gmail, Notion, ...) supports wins. The native share
-sheet gets the link through the Web Share API's separate `url` field
-rather than appended text, since the OS/app already knows how to place
-that appropriately (and often renders a real link preview from it).
+paste target (Slack, Gmail, Notion, ...) supports wins. The link is
+deliberately folded into the plain-text body rather than passed to
+`navigator.share()` as a separate `url` field: some share targets (macOS
+Notes, notably) build their own link-preview card out of a separate
+`{ text, url }` payload — using the first line of `text` as the card's
+title — which visibly reordered and re-styled the message in testing. A
+single plain-text blob renders identically (and correctly) everywhere,
+at the cost of never being a genuine embedded link on platforms that
+would have handled the split fields well.
+
+A Custom-mode share replaces the app URL with a challenge
+link — `?start=XX&dest=YY` — so whoever opens it lands in that exact
+pair instead of setting one up themselves (`shareUrlFor()` /
+`tryStartChallengeFromUrl()` in `js/main.js`); the query string is
+stripped from the address bar once consumed.
 
 ## The map
 
@@ -319,7 +356,7 @@ between two finds that don't actually sit next to each other.
 - Western Sahara is treated as part of Morocco for the purposes of a
   Morocco–Mauritania land connection (a common simplification given the
   disputed territory sits between them).
-- 195 sovereign/de-facto states are included (all UN member states plus
+- 197 sovereign/de-facto states are included (all UN member states plus
   Kosovo, Taiwan, Vatican City, and Palestine).
 - Centroid coordinates are approximate — good enough for map placement and
   the nearest-neighbor fallback rule, not survey-grade GIS data.
@@ -328,8 +365,10 @@ between two finds that don't actually sit next to each other.
 
 Tracked locally via `localStorage` (`js/stats.js`): games played/won,
 best score, average moves, average efficiency, perfect routes, longest
-completed route, and fastest completion time. No account required; the
-storage shape is flat so a real backend could sync the same fields later.
+completed route, fastest completion time, and every country that's ever
+appeared in a completed route (`exploredCodes`, behind the Explorer/
+Well-Traveled achievements above). No account required; the storage shape
+is flat so a real backend could sync the same fields later.
 
 ### Daily streak
 
@@ -348,6 +387,15 @@ optimal into "Perfect", "+1", "+2", "+3", or "+4 or more" (that top bucket
 folds in everything beyond +4 so one wild game can't stretch the chart).
 The bucket from the most recently completed win is highlighted in gold,
 same idea as Wordle highlighting today's result in its own chart.
+
+### Efficiency trend
+
+A small line chart, also in the Statistics panel, of efficiency (optimal
+÷ actual moves) across your most recent wins — `stats.recentGames`, capped
+at the last 20 (`TREND_HISTORY_LIMIT`) so the chart and the stored blob
+can't grow indefinitely for a long-time player. Needs at least 2 wins to
+draw anything; below that it shows a plain "play a few more rounds" note
+instead of a single, meaningless point.
 
 ## Sound and motion
 

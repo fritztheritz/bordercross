@@ -1,11 +1,28 @@
 // Bordercross — wiring. Builds the graph once, then drives Game + RouteMap
 // from DOM events and renders through ui.js.
+//
+// Three modes share the same graph/scoring engine but each get their own
+// Game instance so switching tabs never loses progress in another mode:
+//   - classic:   the daily challenge (fixed per-day puzzle, see daily.js)
+//   - unlimited: a fresh random pair every "New Game" (what Classic used
+//                to be before the daily challenge)
+//   - custom:    the player picks both countries
 
 import { buildGraph, COUNTRY_BY_CODE } from "./graph.js";
 import { Game, randomPair } from "./game.js";
 import { RouteMap } from "./map.js";
 import { resolveCountry } from "./lookup.js";
 import { loadStats, recordResult, resetStats } from "./stats.js";
+import {
+  todayKey,
+  puzzleNumber,
+  msUntilNextMidnight,
+  formatCountdown,
+  dailyPair,
+  loadDailyState,
+  saveDailyState,
+} from "./daily.js";
+import { buildShareText, shareResult } from "./share.js";
 import {
   renderTicket,
   renderRouteChain,
@@ -23,6 +40,7 @@ const els = {
   destName: document.getElementById("destName"),
   optimalMovesText: document.getElementById("optimalMovesText"),
   difficultyBadge: document.getElementById("difficultyBadge"),
+  dailyNumber: document.getElementById("dailyNumber"),
   routeChain: document.getElementById("routeChain"),
   moveForm: document.getElementById("moveForm"),
   countryInput: document.getElementById("countryInput"),
@@ -33,6 +51,7 @@ const els = {
   hintLog: document.getElementById("hintLog"),
   mapContainer: document.getElementById("mapContainer"),
   modeClassicBtn: document.getElementById("modeClassicBtn"),
+  modeUnlimitedBtn: document.getElementById("modeUnlimitedBtn"),
   modeCustomBtn: document.getElementById("modeCustomBtn"),
   newGameBtn: document.getElementById("newGameBtn"),
   statsBtn: document.getElementById("statsBtn"),
@@ -42,6 +61,8 @@ const els = {
   resetStatsBtn: document.getElementById("resetStatsBtn"),
   resultHeadline: document.getElementById("resultHeadline"),
   resultBody: document.getElementById("resultBody"),
+  dailyNextNote: document.getElementById("dailyNextNote"),
+  shareBtn: document.getElementById("shareBtn"),
   playAgainBtn: document.getElementById("playAgainBtn"),
   customStartInput: document.getElementById("customStartInput"),
   customDestInput: document.getElementById("customDestInput"),
@@ -52,12 +73,19 @@ const els = {
 };
 
 const graph = buildGraph();
-const game = new Game(graph);
 const map = new RouteMap(els.mapContainer);
 
-let mode = "classic"; // "classic" | "custom"
+const games = {
+  classic: new Game(graph),
+  unlimited: new Game(graph),
+  custom: new Game(graph),
+};
+let mode = "classic"; // "classic" | "unlimited" | "custom"
+let activeGame = games.classic;
+let lastResult = null;
 let customStartCountry = null;
 let customDestCountry = null;
+let currentDailyKey = todayKey();
 
 // ---------- Modals ----------
 
@@ -110,78 +138,228 @@ els.themeBtn.addEventListener("click", () => {
   applyTheme(next);
 });
 
-// ---------- Mode toggle ----------
+// ---------- Rendering the active game ----------
 
-function setMode(next) {
-  mode = next;
-  els.modeClassicBtn.setAttribute("aria-pressed", String(mode === "classic"));
-  els.modeCustomBtn.setAttribute("aria-pressed", String(mode === "custom"));
-}
-els.modeClassicBtn.addEventListener("click", () => setMode("classic"));
-els.modeCustomBtn.addEventListener("click", () => setMode("custom"));
-
-// ---------- Game flow ----------
-
-function startGame(startCode, destCode) {
-  game.start(startCode, destCode);
+function renderActiveGameView() {
   renderTicket(els, {
-    startEntry: COUNTRY_BY_CODE.get(startCode),
-    destEntry: COUNTRY_BY_CODE.get(destCode),
-    optimalMoves: game.optimalMoves,
+    startEntry: COUNTRY_BY_CODE.get(activeGame.startCode),
+    destEntry: COUNTRY_BY_CODE.get(activeGame.destCode),
+    optimalMoves: activeGame.optimalMoves,
   });
-  renderRouteChain(els, game);
+  els.dailyNumber.hidden = mode !== "classic";
+  if (mode === "classic") els.dailyNumber.textContent = `Daily #${puzzleNumber(currentDailyKey)}`;
+
+  renderRouteChain(els, activeGame);
   clearFeedback(els);
   els.hintLog.textContent = "";
   els.countryInput.value = "";
-  els.countryInput.disabled = false;
-  els.hintBtn.disabled = false;
-  els.giveUpBtn.disabled = false;
-  map.frame(startCode, destCode);
-  map.render(game);
-  els.countryInput.focus();
+
+  const playing = activeGame.status === "playing";
+  els.countryInput.disabled = !playing;
+  els.hintBtn.disabled = !playing;
+  els.giveUpBtn.disabled = !playing;
+
+  map.frame(activeGame.startCode, activeGame.destCode);
+  map.render(activeGame);
+  if (playing) els.countryInput.focus();
 }
 
-function newGame() {
-  if (mode === "classic") {
-    const [start, dest] = randomPair(graph);
-    startGame(start, dest);
+// ---------- Daily (Classic) persistence ----------
+
+function serializeGame(g) {
+  return {
+    startCode: g.startCode,
+    destCode: g.destCode,
+    slots: g.slots,
+    guessedCodes: [...g.guessedCodes],
+    acceptedGuesses: g.acceptedGuesses,
+    hintsUsed: g.hintsUsed,
+    status: g.status,
+    startedAt: g.startedAt,
+    finishedAt: g.finishedAt,
+  };
+}
+
+function restoreGame(g, saved) {
+  g.start(saved.startCode, saved.destCode); // deterministic: same pair, fresh distances
+  g.slots = saved.slots.slice();
+  g.guessedCodes = new Set(saved.guessedCodes);
+  g.acceptedGuesses = saved.acceptedGuesses;
+  g.hintsUsed = saved.hintsUsed;
+  g.status = saved.status;
+  g.startedAt = saved.startedAt;
+  g.finishedAt = saved.finishedAt;
+}
+
+function persistDaily() {
+  saveDailyState(currentDailyKey, serializeGame(games.classic));
+}
+
+function loadDailyPuzzle() {
+  currentDailyKey = todayKey();
+  const saved = loadDailyState(currentDailyKey);
+  if (saved && saved.startCode) {
+    restoreGame(games.classic, saved);
   } else {
-    customStartCountry = null;
-    customDestCountry = null;
-    els.customStartInput.value = "";
-    els.customDestInput.value = "";
-    els.customError.textContent = "";
-    openModal("customModal");
+    const [start, dest] = dailyPair(graph, currentDailyKey);
+    games.classic.start(start, dest);
+    persistDaily();
   }
 }
 
-els.newGameBtn.addEventListener("click", newGame);
-els.playAgainBtn.addEventListener("click", () => {
-  closeModal("resultModal");
-  newGame();
+function syncNewGameButton() {
+  if (mode === "classic") {
+    els.newGameBtn.disabled = true;
+    els.newGameBtn.textContent = `Next: ${formatCountdown(msUntilNextMidnight())}`;
+  } else {
+    els.newGameBtn.disabled = false;
+    els.newGameBtn.textContent = "New Game";
+  }
+}
+
+function startCountdown() {
+  const tick = () => {
+    const key = todayKey();
+    if (key !== currentDailyKey) {
+      loadDailyPuzzle();
+      if (mode === "classic") {
+        renderActiveGameView();
+        renderFeedback(els, "🌅 A new daily puzzle just dropped!", "info");
+      }
+    }
+    syncNewGameButton();
+  };
+  tick();
+  setInterval(tick, 1000);
+}
+
+// ---------- Mode toggle ----------
+
+function setMode(next) {
+  // Custom mode is only committed to once a challenge actually starts
+  // (see beginCustomChallenge) — otherwise canceling the picker would
+  // strand the app on a mode with no game to play.
+  if (next === "custom" && !games.custom.startCode) {
+    openCustomPicker();
+    return;
+  }
+
+  if (mode === "classic" && next !== "classic") persistDaily();
+  mode = next;
+  activeGame = games[mode];
+
+  els.modeClassicBtn.setAttribute("aria-pressed", String(mode === "classic"));
+  els.modeUnlimitedBtn.setAttribute("aria-pressed", String(mode === "unlimited"));
+  els.modeCustomBtn.setAttribute("aria-pressed", String(mode === "custom"));
+
+  syncNewGameButton();
+
+  if (mode === "unlimited" && !activeGame.startCode) {
+    const [start, dest] = randomPair(graph);
+    activeGame.start(start, dest);
+  }
+
+  renderActiveGameView();
+  if (activeGame.status !== "playing") showCompletedResult(activeGame.result());
+}
+
+els.modeClassicBtn.addEventListener("click", () => setMode("classic"));
+els.modeUnlimitedBtn.addEventListener("click", () => setMode("unlimited"));
+els.modeCustomBtn.addEventListener("click", () => setMode("custom"));
+
+// ---------- New Game ----------
+
+function openCustomPicker() {
+  customStartCountry = null;
+  customDestCountry = null;
+  els.customStartInput.value = "";
+  els.customDestInput.value = "";
+  els.customError.textContent = "";
+  openModal("customModal");
+}
+
+els.newGameBtn.addEventListener("click", () => {
+  if (mode === "unlimited") {
+    const [start, dest] = randomPair(graph);
+    games.unlimited.start(start, dest);
+    renderActiveGameView();
+  } else if (mode === "custom") {
+    openCustomPicker();
+  }
 });
 
+els.playAgainBtn.addEventListener("click", () => {
+  closeModal("resultModal");
+  if (mode === "unlimited") {
+    const [start, dest] = randomPair(graph);
+    games.unlimited.start(start, dest);
+    renderActiveGameView();
+  } else if (mode === "custom") {
+    openCustomPicker();
+  }
+});
+
+// ---------- Finishing a game ----------
+
 function finishGame(result) {
+  if (mode === "classic") persistDaily();
   recordResult(result);
-  renderResult(els, game, result);
+  showResultModal(result);
+}
+
+/** Used when restoring an already-completed daily puzzle — shows the same
+ * modal without double-recording stats. */
+function showCompletedResult(result) {
+  showResultModal(result);
+}
+
+function showResultModal(result) {
+  lastResult = result;
+  renderResult(els, activeGame, result);
   els.countryInput.disabled = true;
   els.hintBtn.disabled = true;
   els.giveUpBtn.disabled = true;
+
+  els.playAgainBtn.hidden = mode === "classic";
+  els.dailyNextNote.hidden = mode !== "classic";
+  if (mode === "classic") {
+    els.dailyNextNote.textContent = `Next daily puzzle in ${formatCountdown(msUntilNextMidnight())}.`;
+  }
+
+  els.shareBtn.textContent = "Share Result";
   openModal("resultModal");
 }
+
+els.shareBtn.addEventListener("click", async () => {
+  if (!lastResult) return;
+  const text = buildShareText(activeGame, lastResult, {
+    puzzleNumber: mode === "classic" ? puzzleNumber(currentDailyKey) : null,
+  });
+  const outcome = await shareResult(text);
+  if (outcome === "copied") {
+    els.shareBtn.textContent = "Copied!";
+    setTimeout(() => (els.shareBtn.textContent = "Share Result"), 1800);
+  } else if (outcome === "shared") {
+    els.shareBtn.textContent = "Shared!";
+    setTimeout(() => (els.shareBtn.textContent = "Share Result"), 1800);
+  } else if (outcome === "failed") {
+    els.shareBtn.textContent = "Couldn't share — try again";
+    setTimeout(() => (els.shareBtn.textContent = "Share Result"), 2200);
+  }
+});
 
 // ---------- Move input ----------
 
 attachAutocomplete(els.countryInput, els.suggestions, {
-  excludeCodes: () => (game.status === "playing" ? [game.startCode, ...game.guessedCodes] : []),
+  excludeCodes: () => (activeGame.status === "playing" ? [activeGame.startCode, ...activeGame.guessedCodes] : []),
   onSelect: (country) => submitMove(country[1]),
 });
 
 function submitMove(rawValue) {
   const value = rawValue.trim();
-  if (!value || game.status !== "playing") return;
+  if (!value || activeGame.status !== "playing") return;
 
-  const result = game.attemptMove(value);
+  const result = activeGame.attemptMove(value);
   els.countryInput.value = "";
   els.suggestions.innerHTML = "";
 
@@ -189,41 +367,43 @@ function submitMove(rawValue) {
     if (result.reason === "unrecognized") {
       renderFeedback(els, `❌ "${result.input}" isn't a recognized country.`, "err");
     } else if (result.reason === "is-start") {
-      renderFeedback(els, `❌ ${game.countryName(result.code)} is your starting country.`, "err");
+      renderFeedback(els, `❌ ${activeGame.countryName(result.code)} is your starting country.`, "err");
     } else if (result.reason === "already-found") {
-      renderFeedback(els, `❌ You've already found ${game.countryName(result.code)}.`, "err");
+      renderFeedback(els, `❌ You've already found ${activeGame.countryName(result.code)}.`, "err");
     } else if (result.reason === "too-early") {
       const plural = result.remaining === 1 ? "country" : "countries";
       renderFeedback(
         els,
-        `❌ Not yet — you still need to find ${result.remaining} more ${plural} before ${game.countryName(result.code)} is reachable.`,
+        `❌ Not yet — you still need to find ${result.remaining} more ${plural} before ${activeGame.countryName(result.code)} is reachable.`,
         "err"
       );
     } else if (result.reason === "not-on-path") {
       renderFeedback(
         els,
-        `❌ ${game.countryName(result.code)} isn't on the shortest route between ${game.countryName(game.startCode)} and ${game.countryName(game.destCode)}.`,
+        `❌ ${activeGame.countryName(result.code)} isn't on the shortest route between ${activeGame.countryName(activeGame.startCode)} and ${activeGame.countryName(activeGame.destCode)}.`,
         "err"
       );
     }
+    if (mode === "classic") persistDaily();
     return;
   }
 
   if (result.won) {
-    renderFeedback(els, `✅ ${game.countryName(result.code)} — route complete!`, "ok");
-    renderRouteChain(els, game);
-    map.render(game);
-    finishGame(game.result());
+    renderFeedback(els, `✅ ${activeGame.countryName(result.code)} — route complete!`, "ok");
+    renderRouteChain(els, activeGame);
+    map.render(activeGame);
+    finishGame(activeGame.result());
     return;
   }
 
-  const tag = result.isNewSlot ? `${game.slotCount - result.remaining}/${game.slotCount} found` : "extra guess";
+  const tag = result.isNewSlot ? `${activeGame.slotCount - result.remaining}/${activeGame.slotCount} found` : "extra guess";
   const message = result.isNewSlot
-    ? `✅ ${game.countryName(result.code)} — confirmed on the route`
-    : `✅ ${game.countryName(result.code)} is also on a shortest route, but that step's already covered`;
+    ? `✅ ${activeGame.countryName(result.code)} — confirmed on the route`
+    : `✅ ${activeGame.countryName(result.code)} is also on a shortest route, but that step's already covered`;
   renderFeedback(els, message, "ok", tag);
-  renderRouteChain(els, game);
-  map.render(game);
+  renderRouteChain(els, activeGame);
+  map.render(activeGame);
+  if (mode === "classic") persistDaily();
 }
 
 els.moveForm.addEventListener("submit", (e) => {
@@ -232,19 +412,20 @@ els.moveForm.addEventListener("submit", (e) => {
 });
 
 els.hintBtn.addEventListener("click", () => {
-  const hint = game.hint();
+  const hint = activeGame.hint();
   if (!hint) return;
   const plural = hint.remaining === 1 ? "country" : "countries";
   els.hintLog.textContent =
     hint.remaining === 0
       ? `💡 You've found them all — enter the destination to finish. (−15 pts)`
       : `💡 You still need to find ${hint.remaining} more ${plural}. (−15 pts)`;
+  if (mode === "classic") persistDaily();
 });
 
 els.giveUpBtn.addEventListener("click", () => {
   if (!confirm("Give up and reveal the optimal route? This ends the current game.")) return;
-  game.giveUp();
-  finishGame(game.result());
+  activeGame.giveUp();
+  finishGame(activeGame.result());
 });
 
 // ---------- Stats ----------
@@ -287,7 +468,15 @@ function beginCustomChallenge() {
     return;
   }
   closeModal("customModal");
-  startGame(start[0], dest[0]);
+  if (mode === "classic") persistDaily();
+  games.custom.start(start[0], dest[0]);
+  mode = "custom";
+  activeGame = games.custom;
+  els.modeClassicBtn.setAttribute("aria-pressed", "false");
+  els.modeUnlimitedBtn.setAttribute("aria-pressed", "false");
+  els.modeCustomBtn.setAttribute("aria-pressed", "true");
+  syncNewGameButton();
+  renderActiveGameView();
 }
 
 els.customStartBtn.addEventListener("click", beginCustomChallenge);
@@ -302,5 +491,7 @@ els.customStartBtn.addEventListener("click", beginCustomChallenge);
 
 // ---------- Boot ----------
 
-const [initialStart, initialDest] = randomPair(graph, { minMoves: 4, maxMoves: 7 });
-startGame(initialStart, initialDest);
+loadDailyPuzzle();
+renderActiveGameView();
+if (games.classic.status !== "playing") showCompletedResult(games.classic.result());
+startCountdown();

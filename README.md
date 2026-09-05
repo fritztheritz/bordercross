@@ -87,8 +87,10 @@ js/lookup.js         Name normalization, alias matching, autocomplete search
 js/game.js           Game state machine + scoring (no DOM dependency)
 js/stats.js          localStorage-backed player statistics
 js/map.js            Leaflet route-map rendering (pan/zoom, no political borders)
+js/daily.js          Deterministic daily puzzle (seeded PRNG) + its localStorage persistence
+js/share.js          Wordle-style spoiler-free share text + native share/clipboard
 js/ui.js             DOM rendering helpers
-js/main.js           Event wiring / bootstrapping
+js/main.js           Event wiring / bootstrapping (three Game instances, one per mode)
 ```
 
 Each layer only talks to the ones below it, so e.g. the scoring formula in
@@ -128,14 +130,41 @@ in `js/graph.js`):
 
 ## Game modes
 
-- **Classic** — a random start/destination pair is generated (biased
-  toward a 2–14 move range so games stay interesting), guaranteed solvable
-  since the graph is fully connected.
+Each mode gets its own `Game` instance (`js/main.js`), so switching tabs
+never loses progress in the other two.
+
+- **Classic** — a daily challenge (`js/daily.js`): one fixed start/
+  destination pair per calendar day, the same for every player, that
+  refreshes at midnight *in the player's own local timezone*. The pair is
+  derived deterministically from the date string via a seeded PRNG
+  (`dailyPair()`) — no server or fetch involved, so anyone opening the app
+  on the same day computes the same puzzle independently. Progress
+  persists across reloads via `localStorage` (keyed by date), and once
+  a day's puzzle is finished, reopening the app shows the completed board
+  and result again rather than a fresh attempt — the same one-per-day
+  model as Wordle.
+- **Unlimited** — a fresh random start/destination pair every time you
+  press New Game (biased toward a 2–14 move range so games stay
+  interesting), guaranteed solvable since the graph is fully connected.
+  This is what Classic mode did before the daily challenge existed.
 - **Custom** — pick your own start and destination.
 
-The architecture (`Game` class in `js/game.js`, `randomPair()`) is built so
-additional modes (timed runs, daily challenge, etc.) can be added as thin
-wrappers around the same graph and scoring logic.
+## Sharing a result
+
+After finishing a run (win or give-up), **Share Result** builds a spoiler-
+free summary — flags, move count, and a row of squares, but never the
+country names themselves — and either opens the device's native share
+sheet (`navigator.share`, so on mobile you can send it straight to
+Messages, the same flow as Wordle) or copies it to the clipboard on
+desktop (`js/share.js`). A Classic/daily result includes the puzzle
+number so people can compare the same day's puzzle:
+
+```
+Bordercross #247 🇸🇬 → 🇧🇿
+🏆 Perfect — 8/8 moves
+🟩🟩🟩🟩🟩🟩🟩🟩
+Score: 100
+```
 
 ## The map
 

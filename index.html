@@ -18,6 +18,7 @@
       <div class="topbar-controls">
         <div class="mode-toggle" role="group" aria-label="Game mode">
           <button type="button" id="modeClassicBtn" aria-pressed="true">Classic</button>
+          <button type="button" id="modeUnlimitedBtn" aria-pressed="false">Unlimited</button>
           <button type="button" id="modeCustomBtn" aria-pressed="false">Custom</button>
         </div>
         <button type="button" class="btn btn-primary" id="newGameBtn">New Game</button>
@@ -34,6 +35,7 @@
       </div>
       <div class="perforation" aria-hidden="true"></div>
       <div class="stamp">
+        <span class="daily-number mono" id="dailyNumber" hidden></span>
         <span class="stamp-moves mono" id="optimalMovesText">— moves possible</span>
         <span class="difficulty-badge" id="difficultyBadge"></span>
       </div>
@@ -106,6 +108,12 @@
       <p>The map on the right is a real, pannable, zoomable basemap — deliberately without political borders drawn on it, so it can't hint at what's adjacent to what.</p>
       <p>The optimal number of steps is shown before you start, but the countries themselves never are, until you find them (or <strong>Give Up</strong> to reveal the route).</p>
       <p class="muted">Hints cost points: a hint tells you how many countries you still need to find, without naming them.</p>
+
+      <div class="rule-block land">
+        <div class="rule-title">Game modes</div>
+        <p class="muted"><strong>Classic</strong> is a daily challenge — one fixed start/destination pair, the same for everyone, that refreshes at midnight in your local timezone. <strong>Unlimited</strong> generates a fresh random pair every time you press New Game. <strong>Custom</strong> lets you pick both countries yourself.</p>
+      </div>
+      <p class="muted">After finishing a run, <strong>Share Result</strong> copies (or opens your share sheet with) a spoiler-free summary — flags, move count, and a row of squares, no country names — so you can compare with friends over text.</p>
     </div>
   </div>
 
@@ -153,8 +161,10 @@
       <div class="modal-close-row"><button class="icon-btn" data-close="resultModal" aria-label="Close">✕</button></div>
       <h2 class="result-headline" id="resultHeadline">🎉 You made it!</h2>
       <div id="resultBody"></div>
+      <p class="muted daily-next-note" id="dailyNextNote" hidden></p>
       <div class="modal-actions">
-        <button type="button" class="btn btn-primary" id="playAgainBtn">New Game</button>
+        <button type="button" class="btn btn-primary" id="shareBtn">Share Result</button>
+        <button type="button" class="btn" id="playAgainBtn">New Game</button>
       </div>
     </div>
   </div>

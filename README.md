@@ -186,7 +186,12 @@ never loses progress in the other two.
   on the same day computes the same puzzle independently. The day's
   difficulty is drawn from a weighted mix — 25% Easy, 50% Medium, 25% Hard
   — rather than a single fixed range, so most days feel substantial
-  without every day being a slog. Progress persists across reloads via
+  without every day being a slog. `dailyPair()` also retries its seeded
+  draw against the previous 30 days' pairs (treating `A→B` and `B→A` as
+  the same pair) so a puzzle can't repeat within about a month — that
+  history is never stored, it's recomputed from the same seeded sequence
+  every time, so every player still arrives at the identical answer with
+  no server round-trip. Progress persists across reloads via
   `localStorage` (keyed by date), and once a day's puzzle is finished,
   reopening the app shows the completed board and result again rather
   than a fresh attempt — the same one-per-day model as Wordle.

@@ -66,20 +66,27 @@ export function buildShareText(game, result, opts = {}) {
 }
 
 /**
- * Shares via the native share sheet when available (mobile — lets the
+ * Shares via the native share sheet when available (mobile/macOS — lets the
  * player send straight to Messages, exactly like Wordle), falling back to
  * a clipboard copy on desktop. The clipboard copy writes both a plain-text
- * version (the link stands in for the "BorderCross" header word itself,
- * since plain text can't carry a real hyperlink but a bare URL is reliably
- * auto-linkified) and a rich-text version (the "BorderCross" wordmark itself
+ * version (the link goes on its own trailing line — plain text can't carry
+ * a real hyperlink on an arbitrary word, but a bare URL by itself reliably
+ * auto-linkifies) and a rich-text version (the "BorderCross" wordmark itself
  * is the hyperlink) — whichever the paste target supports wins.
- * @param {{ text: string, html: string|null, plainWithLink: string, url: string|null }} share
+ *
+ * `url` is deliberately folded into `plainWithLink` rather than passed to
+ * `navigator.share()` as its own field: several share targets (e.g. macOS
+ * Notes) treat a separate `{ text, url }` payload as "build a link-preview
+ * card, using the first line of `text` as its title" — which visibly
+ * reorders and re-styles the message in ways this app has no control over.
+ * A single plain-text blob renders identically (and correctly) everywhere.
+ * @param {{ html: string|null, plainWithLink: string }} share
  * @returns {Promise<"shared"|"copied"|"cancelled"|"failed">}
  */
-export async function shareResult({ text, html, plainWithLink, url }) {
+export async function shareResult({ html, plainWithLink }) {
   if (navigator.share) {
     try {
-      await navigator.share(url ? { text, url } : { text });
+      await navigator.share({ text: plainWithLink });
       return "shared";
     } catch (err) {
       if (err && err.name === "AbortError") return "cancelled";

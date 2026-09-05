@@ -31,7 +31,7 @@ const els = {
   hintBtn: document.getElementById("hintBtn"),
   giveUpBtn: document.getElementById("giveUpBtn"),
   hintLog: document.getElementById("hintLog"),
-  mapSvg: document.getElementById("mapSvg"),
+  mapContainer: document.getElementById("mapContainer"),
   modeClassicBtn: document.getElementById("modeClassicBtn"),
   modeCustomBtn: document.getElementById("modeCustomBtn"),
   newGameBtn: document.getElementById("newGameBtn"),
@@ -53,7 +53,7 @@ const els = {
 
 const graph = buildGraph();
 const game = new Game(graph);
-const map = new RouteMap(els.mapSvg);
+const map = new RouteMap(els.mapContainer);
 
 let mode = "classic"; // "classic" | "custom"
 let customStartCountry = null;
@@ -136,7 +136,8 @@ function startGame(startCode, destCode) {
   els.countryInput.disabled = false;
   els.hintBtn.disabled = false;
   els.giveUpBtn.disabled = false;
-  map.render(game.route, game.destCode);
+  map.frame(startCode, destCode);
+  map.render(game);
   els.countryInput.focus();
 }
 
@@ -172,7 +173,7 @@ function finishGame(result) {
 // ---------- Move input ----------
 
 attachAutocomplete(els.countryInput, els.suggestions, {
-  excludeCodes: () => (game.status === "playing" ? [...game.visited] : []),
+  excludeCodes: () => (game.status === "playing" ? [game.startCode, ...game.guessedCodes] : []),
   onSelect: (country) => submitMove(country[1]),
 });
 
@@ -187,27 +188,42 @@ function submitMove(rawValue) {
   if (!result.ok) {
     if (result.reason === "unrecognized") {
       renderFeedback(els, `❌ "${result.input}" isn't a recognized country.`, "err");
-    } else if (result.reason === "current") {
-      renderFeedback(els, `❌ You're already in ${game.countryName(result.code)}.`, "err");
-    } else if (result.reason === "visited") {
-      renderFeedback(els, `❌ ${game.countryName(result.code)} is already in your route.`, "err");
-    } else if (result.reason === "not-connected") {
+    } else if (result.reason === "is-start") {
+      renderFeedback(els, `❌ ${game.countryName(result.code)} is your starting country.`, "err");
+    } else if (result.reason === "already-found") {
+      renderFeedback(els, `❌ You've already found ${game.countryName(result.code)}.`, "err");
+    } else if (result.reason === "too-early") {
+      const plural = result.remaining === 1 ? "country" : "countries";
       renderFeedback(
         els,
-        `❌ ${game.countryName(result.code)} is not directly connected to ${game.countryName(result.from)}.`,
+        `❌ Not yet — you still need to find ${result.remaining} more ${plural} before ${game.countryName(result.code)} is reachable.`,
+        "err"
+      );
+    } else if (result.reason === "not-on-path") {
+      renderFeedback(
+        els,
+        `❌ ${game.countryName(result.code)} isn't on the shortest route between ${game.countryName(game.startCode)} and ${game.countryName(game.destCode)}.`,
         "err"
       );
     }
     return;
   }
 
-  renderFeedback(els, `✅ ${game.countryName(result.code)}`, "ok", result.connection);
-  renderRouteChain(els, game);
-  map.render(game.route, game.destCode);
-
   if (result.won) {
+    renderFeedback(els, `✅ ${game.countryName(result.code)} — route complete!`, "ok");
+    renderRouteChain(els, game);
+    map.render(game);
     finishGame(game.result());
+    return;
   }
+
+  const tag = result.isNewSlot ? `${game.slotCount - result.remaining}/${game.slotCount} found` : "extra guess";
+  const message = result.isNewSlot
+    ? `✅ ${game.countryName(result.code)} — confirmed on the route`
+    : `✅ ${game.countryName(result.code)} is also on a shortest route, but that step's already covered`;
+  renderFeedback(els, message, "ok", tag);
+  renderRouteChain(els, game);
+  map.render(game);
 }
 
 els.moveForm.addEventListener("submit", (e) => {
@@ -219,7 +235,10 @@ els.hintBtn.addEventListener("click", () => {
   const hint = game.hint();
   if (!hint) return;
   const plural = hint.remaining === 1 ? "country" : "countries";
-  els.hintLog.textContent = `💡 There ${hint.remaining === 1 ? "is" : "are"} ${hint.remaining} ${plural} remaining on the optimal route from here. (−15 pts)`;
+  els.hintLog.textContent =
+    hint.remaining === 0
+      ? `💡 You've found them all — enter the destination to finish. (−15 pts)`
+      : `💡 You still need to find ${hint.remaining} more ${plural}. (−15 pts)`;
 });
 
 els.giveUpBtn.addEventListener("click", () => {
@@ -283,5 +302,5 @@ els.customStartBtn.addEventListener("click", beginCustomChallenge);
 
 // ---------- Boot ----------
 
-const [initialStart, initialDest] = randomPair(graph, { minMoves: 3, maxMoves: 4 });
+const [initialStart, initialDest] = randomPair(graph, { minMoves: 4, maxMoves: 7 });
 startGame(initialStart, initialDest);

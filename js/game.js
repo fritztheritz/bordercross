@@ -2,9 +2,21 @@
 //
 // This module has no DOM dependency: it only knows about the graph and
 // the rules. ui.js drives it and renders the results.
+//
+// Rule: a guess is accepted if the country lies on *some* shortest path
+// between the start and destination — not only if it's adjacent to
+// wherever the player currently is. That membership test is the standard
+// BFS one: `v` is on a shortest path iff
+//   distFromStart(v) + distFromDest(v) === optimalMoves
+// Guesses can therefore be made in any order — naming "Mexico" before
+// "United States" for a Canada -> Guatemala run is just as valid as the
+// reverse, as long as both are eventually found. Each accepted guess is
+// slotted into its correct position (its distance from the start) so the
+// displayed route is always shown in the right order regardless of the
+// order it was discovered in.
 
 import { COUNTRY_BY_CODE } from "./graph.js";
-import { bfsPath, bfsDistances, connectionType, difficultyFor } from "./graph.js";
+import { bfsPath, bfsDistances, difficultyFor } from "./graph.js";
 import { resolveCountry } from "./lookup.js";
 
 const HINT_PENALTY = 15;
@@ -33,9 +45,14 @@ export class Game {
     this.optimalPath = optimalPath;
     this.optimalMoves = optimalPath.length - 1;
     this.difficulty = difficultyFor(this.optimalMoves);
-    this.route = [startCode];
-    this.visited = new Set([startCode]);
-    this.current = startCode;
+    this.distFromStart = bfsDistances(this.graph, startCode);
+    this.distFromDest = bfsDistances(this.graph, destCode);
+
+    // One slot per intermediate step on the route (excludes start & dest).
+    this.slotCount = Math.max(0, this.optimalMoves - 1);
+    this.slots = new Array(this.slotCount).fill(null);
+    this.guessedCodes = new Set();
+    this.acceptedGuesses = 0; // slot fills + redundant valid alternates + the final dest entry
     this.hintsUsed = 0;
     this.startedAt = null;
     this.finishedAt = null;
@@ -43,41 +60,65 @@ export class Game {
     return this;
   }
 
-  /** Result shape: { ok, reason?, code?, connection?, won? } */
+  get slotsFilled() {
+    return this.slots.filter((s) => s != null).length;
+  }
+
+  get allSlotsFilled() {
+    return this.slotsFilled === this.slotCount;
+  }
+
+  /** 1-indexed distance-from-start of `code` if it lies on some shortest
+   * path, or null otherwise. */
+  layerOf(code) {
+    const ds = this.distFromStart.get(code);
+    const dd = this.distFromDest.get(code);
+    if (ds === undefined || dd === undefined) return null;
+    if (ds + dd !== this.optimalMoves) return null;
+    if (ds < 1 || ds > this.optimalMoves - 1) return null;
+    return ds;
+  }
+
+  /** Result shape varies by outcome — see call sites in main.js. */
   attemptMove(rawInput) {
     if (this.status !== "playing") return { ok: false, reason: "not-playing" };
     if (this.startedAt == null) this.startedAt = Date.now();
 
     const country = resolveCountry(rawInput);
     if (!country) return { ok: false, reason: "unrecognized", input: rawInput };
-
     const code = country[0];
-    if (code === this.current) return { ok: false, reason: "current", code };
-    if (this.visited.has(code)) return { ok: false, reason: "visited", code };
 
-    const connection = connectionType(this.graph, this.current, code);
-    if (!connection) return { ok: false, reason: "not-connected", code, from: this.current };
-
-    this.route.push(code);
-    this.visited.add(code);
-    this.current = code;
+    if (code === this.startCode) return { ok: false, reason: "is-start", code };
 
     if (code === this.destCode) {
+      if (!this.allSlotsFilled) {
+        return { ok: false, reason: "too-early", code, remaining: this.slotCount - this.slotsFilled };
+      }
+      this.acceptedGuesses += 1;
       this.status = "won";
       this.finishedAt = Date.now();
-      return { ok: true, code, connection, won: true };
+      return { ok: true, code, won: true };
     }
-    return { ok: true, code, connection, won: false };
+
+    if (this.guessedCodes.has(code)) return { ok: false, reason: "already-found", code };
+
+    const layer = this.layerOf(code);
+    if (layer == null) return { ok: false, reason: "not-on-path", code };
+
+    this.guessedCodes.add(code);
+    this.acceptedGuesses += 1;
+    const slotIndex = layer - 1;
+    const isNewSlot = this.slots[slotIndex] == null;
+    if (isNewSlot) this.slots[slotIndex] = code;
+
+    return { ok: true, code, slotIndex, isNewSlot, remaining: this.slotCount - this.slotsFilled };
   }
 
-  /** Cheap hint: whether the next move must be a land or sea link is not
-   * revealed — only how many countries remain on the *optimal* route from
-   * here, without naming them. */
+  /** Cheap hint: how many countries are still unfound, without naming them. */
   hint() {
     if (this.status !== "playing") return null;
     this.hintsUsed += 1;
-    const remaining = bfsDistances(this.graph, this.current).get(this.destCode);
-    return { remaining, hintsUsed: this.hintsUsed };
+    return { remaining: this.slotCount - this.slotsFilled, hintsUsed: this.hintsUsed };
   }
 
   giveUp() {
@@ -86,13 +127,18 @@ export class Game {
     this.finishedAt = Date.now();
   }
 
+  /** [start, ...slots (nullable), dest] — always the right length/order. */
+  displaySequence() {
+    return [this.startCode, ...this.slots, this.destCode];
+  }
+
   result() {
-    const playerMoves = this.route.length - 1;
+    const playerMoves = this.acceptedGuesses;
     const timeMs = this.startedAt && this.finishedAt ? this.finishedAt - this.startedAt : null;
     if (this.status === "won") {
       return {
         status: "won",
-        route: this.route,
+        route: this.displaySequence(),
         playerMoves,
         optimalMoves: this.optimalMoves,
         optimalPath: this.optimalPath,
@@ -105,7 +151,7 @@ export class Game {
     }
     return {
       status: "gaveup",
-      route: this.route,
+      route: this.displaySequence().filter((code) => code != null),
       optimalMoves: this.optimalMoves,
       optimalPath: this.optimalPath,
     };
@@ -117,7 +163,7 @@ export class Game {
 }
 
 /** Picks a random (start, destination) pair with a "fun" difficulty range. */
-export function randomPair(graph, { minMoves = 2, maxMoves = 8 } = {}) {
+export function randomPair(graph, { minMoves = 2, maxMoves = 14 } = {}) {
   const codes = [...graph.keys()];
   for (let attempt = 0; attempt < 40; attempt++) {
     const start = codes[Math.floor(Math.random() * codes.length)];

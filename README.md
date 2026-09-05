@@ -1,7 +1,7 @@
 # Bordercross
 
-Navigate from a starting country to a destination by entering a chain of
-geographically connected countries — using as few of them as possible.
+Given a starting country and a destination, name every country that sits
+on the shortest possible route between them — in any order.
 
 Given `Canada → Guatemala`, the shortest path is:
 
@@ -9,10 +9,15 @@ Given `Canada → Guatemala`, the shortest path is:
 Canada → United States → Mexico → Guatemala
 ```
 
-So the player enters `United States`, then `Mexico`. Padding the route with
-an unnecessary detour (`Canada → United States → Brazil → Mexico →
-Guatemala`) is technically still a valid path, but it costs score — the
-game always knows the true shortest route and grades you against it.
+So the player needs to find `United States` and `Mexico`. They can be
+guessed in either order — entering `Mexico` before `United States` is just
+as valid as the reverse, since both genuinely sit on the shortest route.
+Each correct guess slots into its right position automatically, so the
+displayed route is always shown in order regardless of the order it was
+discovered in. Guessing something that *isn't* on any shortest route (e.g.
+`Brazil`) is simply rejected — there's no way to "detour" onto a longer
+valid path, since only path membership is checked, not adjacency to
+wherever the player currently is.
 
 ## Running it
 
@@ -27,10 +32,23 @@ python3 -m http.server 8000
 
 Then open the printed local URL in a browser.
 
+## How a guess is validated
+
+A guessed country is accepted if it lies on *at least one* shortest path
+between the start and destination — the standard BFS test: run breadth-
+first search from both the start and the destination once at the start of
+a game, and a country `v` qualifies iff
+`distFromStart(v) + distFromDest(v) === optimalMoves`. That's what makes
+order irrelevant: each guess is checked independently against this
+membership test, not against whatever the player most recently found.
+Once a valid guess is made, it's slotted into its correct position (its
+distance from the start) for display, so out-of-order discovery still
+renders as an in-order route (`Game.layerOf()` in `js/game.js`).
+
 ## How the connection graph works
 
-Every move is validated against the same graph that computes the "optimal"
-route, so the two can never disagree (`js/graph.js`, `js/data.js`).
+The membership test above runs against the same graph that computes the
+"optimal" route, so the two can never disagree (`js/graph.js`, `js/data.js`).
 
 - **Land border** — two countries are connected if they share a land
   border (`LAND_EDGES` in `js/data.js`), built from standard geographic
@@ -68,7 +86,7 @@ js/graph.js          Graph construction, BFS shortest-path, difficulty
 js/lookup.js         Name normalization, alias matching, autocomplete search
 js/game.js           Game state machine + scoring (no DOM dependency)
 js/stats.js          localStorage-backed player statistics
-js/map.js            SVG route-map rendering
+js/map.js            Leaflet route-map rendering (pan/zoom, no political borders)
 js/ui.js             DOM rendering helpers
 js/main.js           Event wiring / bootstrapping
 ```
@@ -79,12 +97,21 @@ touching the graph or the data.
 
 ## Scoring
 
-Defined in `scoreFor()` in `js/game.js`:
+Defined in `scoreFor()` in `js/game.js`. "Moves" here means total accepted
+guesses — every correct find, including a redundant one (see below) — plus
+the final destination entry, so a flawless run costs exactly the optimal
+move count, same as before this counted order-independent guesses:
 
 - Perfect (optimal) route: **100 points**
 - Each extra move beyond optimal: **−10 points**
 - Each hint used: **−15 points**
 - Floors at 0
+
+A "redundant" guess is a country that's genuinely on *some* shortest path
+but whose position in the route was already filled by a different valid
+country — this happens when more than one shortest path exists (a tie).
+It's accepted (it's not wrong), but it doesn't advance progress and counts
+against efficiency like an extra move would.
 
 Efficiency is reported as `optimal moves / player moves`, as a percentage.
 
@@ -95,14 +122,14 @@ in `js/graph.js`):
 
 | Optimal moves | Difficulty |
 |---|---|
-| 1–3 | Easy |
-| 4–6 | Medium |
-| 7+ | Hard |
+| 1–4 | Easy |
+| 5–9 | Medium |
+| 10+ | Hard |
 
 ## Game modes
 
 - **Classic** — a random start/destination pair is generated (biased
-  toward a 2–8 move range so games stay interesting), guaranteed solvable
+  toward a 2–14 move range so games stay interesting), guaranteed solvable
   since the graph is fully connected.
 - **Custom** — pick your own start and destination.
 
@@ -110,11 +137,20 @@ The architecture (`Game` class in `js/game.js`, `randomPair()`) is built so
 additional modes (timed runs, daily challenge, etc.) can be added as thin
 wrappers around the same graph and scoring logic.
 
+## The map
+
+`js/map.js` renders a real [Leaflet](https://leafletjs.com/) map — fully
+pannable and zoomable — using Esri's "World Physical" basemap tiles. That
+basemap was chosen specifically because it draws terrain and coastlines
+but no political borders or country labels, so the map itself can never
+give away which countries are adjacent to which. Country markers use the
+same centroid coordinates as the rest of the game (`js/data.js`); a solid
+line is only drawn between two markers that are both confirmed *and*
+adjacent positions in the route, so the map never implies a connection
+between two finds that don't actually sit next to each other.
+
 ## Data notes / known simplifications
 
-- The map (`js/map.js`) plots approximate country centroids on an
-  equirectangular grid rather than shipping full coastline/polygon data —
-  it's a stylized route/position map, not a political map.
 - Western Sahara is treated as part of Morocco for the purposes of a
   Morocco–Mauritania land connection (a common simplification given the
   disputed territory sits between them).

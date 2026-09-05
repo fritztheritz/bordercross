@@ -109,7 +109,7 @@ export function connectionType(graph, a, b) {
 }
 
 export function difficultyFor(optimalMoves) {
-  if (optimalMoves <= 3) return "Easy";
-  if (optimalMoves <= 6) return "Medium";
+  if (optimalMoves <= 4) return "Easy";
+  if (optimalMoves <= 9) return "Medium";
   return "Hard";
 }

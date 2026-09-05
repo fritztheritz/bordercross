@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Bordercross</title>
   <meta name="description" content="Navigate from a starting country to a destination using the fewest border crossings." />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link rel="stylesheet" href="css/styles.css" />
 </head>
 <body>
@@ -52,7 +53,7 @@
             type="text"
             id="countryInput"
             class="move-input"
-            placeholder="Enter the next country…"
+            placeholder="Enter any country on the route…"
             autocomplete="off"
             aria-label="Next country"
           />
@@ -70,10 +71,11 @@
       </div>
 
       <div class="panel map-panel">
-        <svg class="map-svg" id="mapSvg" role="img" aria-label="Route map"></svg>
+        <div class="map-svg" id="mapContainer" role="img" aria-label="Route map — pan and zoom to explore"></div>
         <p class="map-caption">
-          Gold line — your route. Dashed grey — remaining distance to the destination (not the optimal path).
-          This is a stylized position map, not a political map.
+          Drag to pan, scroll or pinch to zoom. Pins mark countries you've confirmed — gold lines connect
+          confirmed finds that sit next to each other in the route. This basemap has no political borders on
+          purpose, so it won't give away what's adjacent to what.
         </p>
       </div>
     </section>
@@ -84,20 +86,26 @@
     <div class="modal" role="dialog" aria-modal="true" aria-labelledby="howToTitle">
       <div class="modal-close-row"><button class="icon-btn" data-close="howToModal" aria-label="Close">✕</button></div>
       <h2 id="howToTitle">How to Play</h2>
-      <p>You're given a <strong>START</strong> country and a <strong>DESTINATION</strong> country. Enter countries one at a time to build a path between them — you can only move to a country that's geographically connected to your current one.</p>
-      <p>Your goal is to reach the destination using the <strong>fewest possible countries</strong>. Unnecessary detours cost you score.</p>
+      <p>You're given a <strong>START</strong> country and a <strong>DESTINATION</strong> country. Your job is to name every country that sits on the shortest possible route between them.</p>
+      <p>You can guess them in <strong>any order</strong> — for a Canada → Guatemala run, naming "Mexico" before "United States" is just as valid as the reverse. Each correct guess slots into its right position automatically, so the route always displays in order even though you found it out of order. Once every step is found, enter the destination to complete the route.</p>
+      <p>Your goal is to find the route using the <strong>fewest possible guesses</strong> — wrong guesses don't cost you anything except a retry, but re-finding a step you already have, or needing hints, does.</p>
 
       <div class="rule-block land">
+        <div class="rule-title">What counts as "on the route"</div>
+        <p class="muted">A country qualifies if it lies on at least one shortest path between the start and destination — determined the same way a map app finds directions: by the network of land borders and sea crossings below, not by straight-line distance.</p>
+      </div>
+      <div class="rule-block land">
         <div class="rule-title">Land connections</div>
-        <p class="muted">Two countries are connected whenever they share a land border — Canada → United States, United States → Mexico, and so on.</p>
+        <p class="muted">Two countries are connected whenever they share a land border — Canada–United States, United States–Mexico, and so on.</p>
       </div>
       <div class="rule-block sea">
         <div class="rule-title">Sea connections</div>
         <p class="muted">Countries that don't share a land border can still be connected across a short, well-known sea crossing or strait — the UK and France across the Channel, Spain and Morocco across Gibraltar, Russia and the United States across the Bering Strait. A handful of longer "gateway" links (Iceland–UK, Australia–New Zealand) are included too, since those nations would otherwise have no route to the rest of the world at all. This list is fixed and curated, not "anything nearby" — see the project README for the full rule and the complete list.</p>
       </div>
 
-      <p>The optimal route is calculated before you start, but never shown — only the number of moves it takes. You can <strong>Give Up</strong> at any point to reveal it.</p>
-      <p class="muted">Hints cost points: a hint tells you how many countries remain on the optimal route from where you are, without naming them.</p>
+      <p>The map on the right is a real, pannable, zoomable basemap — deliberately without political borders drawn on it, so it can't hint at what's adjacent to what.</p>
+      <p>The optimal number of steps is shown before you start, but the countries themselves never are, until you find them (or <strong>Give Up</strong> to reveal the route).</p>
+      <p class="muted">Hints cost points: a hint tells you how many countries you still need to find, without naming them.</p>
     </div>
   </div>
 
@@ -151,6 +159,7 @@
     </div>
   </div>
 
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script type="module" src="js/main.js"></script>
 </body>
 </html>

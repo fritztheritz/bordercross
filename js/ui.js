@@ -18,54 +18,56 @@ export function renderTicket(els, { startEntry, destEntry, optimalMoves }) {
   els.difficultyBadge.className = `difficulty-badge difficulty-${difficulty.toLowerCase()}`;
 }
 
+/** Renders Start → [found or blank slot] × N → Destination. Slots can be
+ * filled in any order (see game.js), but always display in their correct
+ * position, so the chain reads correctly regardless of discovery order. */
 export function renderRouteChain(els, game) {
   els.routeChain.innerHTML = "";
   const frag = document.createDocumentFragment();
+  const sequence = game.displaySequence();
 
-  game.route.forEach((code, i) => {
+  sequence.forEach((code, i) => {
     if (i > 0) {
       const arrow = document.createElement("span");
       arrow.className = "chain-arrow";
       arrow.textContent = "→";
       frag.appendChild(arrow);
     }
+
     const isStart = i === 0;
-    const isCurrent = i === game.route.length - 1 && game.status === "playing";
+    const isDest = i === sequence.length - 1;
     const chip = document.createElement("span");
-    chip.className = `chain-chip ${isStart ? "start" : isCurrent ? "current" : "visited"}`;
-    chip.textContent = `${flagEmoji(code)} ${game.countryName(code)}`;
+
+    if (isDest) {
+      chip.className = `chain-chip dest${game.status === "won" ? " reached" : ""}`;
+      chip.textContent = `${flagEmoji(code)} ${game.countryName(code)}`;
+    } else if (isStart) {
+      chip.className = "chain-chip start";
+      chip.textContent = `${flagEmoji(code)} ${game.countryName(code)}`;
+    } else if (code != null) {
+      chip.className = "chain-chip visited";
+      chip.textContent = `${flagEmoji(code)} ${game.countryName(code)}`;
+    } else {
+      chip.className = "chain-chip blank";
+      chip.textContent = `· ${i} ·`;
+    }
     frag.appendChild(chip);
   });
-
-  if (game.current !== game.destCode) {
-    const arrow = document.createElement("span");
-    arrow.className = "chain-arrow";
-    arrow.textContent = "⇢";
-    frag.appendChild(arrow);
-
-    const chip = document.createElement("span");
-    chip.className = "chain-chip dest";
-    chip.textContent = `${flagEmoji(game.destCode)} ${game.countryName(game.destCode)}`;
-    frag.appendChild(chip);
-  } else {
-    const last = frag.lastElementChild;
-    if (last) last.classList.add("dest", "reached");
-  }
 
   els.routeChain.appendChild(frag);
 }
 
-export function renderFeedback(els, message, kind, connectionType) {
+export function renderFeedback(els, message, kind, tag) {
   els.feedback.className = `feedback ${kind}`;
   els.feedback.innerHTML = "";
   const text = document.createElement("span");
   text.textContent = message;
   els.feedback.appendChild(text);
-  if (connectionType) {
-    const tag = document.createElement("span");
-    tag.className = "connection-tag";
-    tag.textContent = connectionType === "land" ? "land border" : "sea crossing";
-    els.feedback.appendChild(tag);
+  if (tag) {
+    const tagEl = document.createElement("span");
+    tagEl.className = "connection-tag";
+    tagEl.textContent = tag;
+    els.feedback.appendChild(tagEl);
   }
 }
 

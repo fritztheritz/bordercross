@@ -18,7 +18,7 @@ function normalize(str) {
 
 // code -> [normalized name, ...normalized aliases]
 const SEARCH_TERMS = new Map(
-  COUNTRIES.map(([code, name, , , aliases = []]) => [
+  COUNTRIES.map(([code, name, , , , aliases = []]) => [
     code,
     [normalize(name), ...aliases.map(normalize)],
   ])

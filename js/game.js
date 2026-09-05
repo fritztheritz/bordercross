@@ -52,11 +52,21 @@ export class Game {
     this.slotCount = Math.max(0, this.optimalMoves - 1);
     this.slots = new Array(this.slotCount).fill(null);
     this.guessedCodes = new Set();
-    this.acceptedGuesses = 0; // slot fills + redundant valid alternates + the final dest entry
+    this.wrongGuesses = new Set(); // guesses that resolved to a real country, but aren't on any shortest path
+    this.acceptedGuesses = 0; // slot fills + redundant valid alternates
     this.hintsUsed = 0;
     this.startedAt = null;
     this.finishedAt = null;
     this.status = "playing"; // "playing" | "won" | "gaveup"
+
+    // Start and destination already directly connected — nothing to find.
+    // acceptedGuesses is still set to 1 (matching optimalMoves) so scoring
+    // and the "perfect route" check stay consistent with every other case.
+    if (this.slotCount === 0) {
+      this.status = "won";
+      this.acceptedGuesses = 1;
+      this.startedAt = this.finishedAt = Date.now();
+    }
     return this;
   }
 
@@ -79,7 +89,9 @@ export class Game {
     return ds;
   }
 
-  /** Result shape varies by outcome — see call sites in main.js. */
+  /** Result shape varies by outcome — see call sites in main.js. The
+   * destination is never a guess: the game recognizes the route as
+   * complete automatically the moment the last intermediate slot fills. */
   attemptMove(rawInput) {
     if (this.status !== "playing") return { ok: false, reason: "not-playing" };
     if (this.startedAt == null) this.startedAt = Date.now();
@@ -89,21 +101,14 @@ export class Game {
     const code = country[0];
 
     if (code === this.startCode) return { ok: false, reason: "is-start", code };
-
-    if (code === this.destCode) {
-      if (!this.allSlotsFilled) {
-        return { ok: false, reason: "too-early", code, remaining: this.slotCount - this.slotsFilled };
-      }
-      this.acceptedGuesses += 1;
-      this.status = "won";
-      this.finishedAt = Date.now();
-      return { ok: true, code, won: true };
-    }
-
+    if (code === this.destCode) return { ok: false, reason: "is-dest", code };
     if (this.guessedCodes.has(code)) return { ok: false, reason: "already-found", code };
 
     const layer = this.layerOf(code);
-    if (layer == null) return { ok: false, reason: "not-on-path", code };
+    if (layer == null) {
+      this.wrongGuesses.add(code);
+      return { ok: false, reason: "not-on-path", code };
+    }
 
     this.guessedCodes.add(code);
     this.acceptedGuesses += 1;
@@ -111,14 +116,34 @@ export class Game {
     const isNewSlot = this.slots[slotIndex] == null;
     if (isNewSlot) this.slots[slotIndex] = code;
 
+    if (this.allSlotsFilled) {
+      // The final hop onto the destination is automatic, but still counts
+      // as a move — otherwise a flawless run would tally one move short of
+      // optimalMoves and never register as "perfect".
+      this.acceptedGuesses += 1;
+      this.status = "won";
+      this.finishedAt = Date.now();
+      return { ok: true, code, slotIndex, isNewSlot, remaining: 0, won: true };
+    }
+
     return { ok: true, code, slotIndex, isNewSlot, remaining: this.slotCount - this.slotsFilled };
   }
 
-  /** Cheap hint: how many countries are still unfound, without naming them. */
+  /** A hint reveals the region of the earliest still-unfound step —
+   * concrete enough to actually help, without naming the country. */
   hint() {
     if (this.status !== "playing") return null;
     this.hintsUsed += 1;
-    return { remaining: this.slotCount - this.slotsFilled, hintsUsed: this.hintsUsed };
+    const emptyIndex = this.slots.findIndex((s) => s == null);
+    if (emptyIndex === -1) return { remaining: 0, hintsUsed: this.hintsUsed };
+    const revealCode = this.optimalPath[emptyIndex + 1];
+    const region = COUNTRY_BY_CODE.get(revealCode)[4];
+    return {
+      remaining: this.slotCount - this.slotsFilled,
+      stepNumber: emptyIndex + 1,
+      region,
+      hintsUsed: this.hintsUsed,
+    };
   }
 
   giveUp() {

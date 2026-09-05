@@ -31,6 +31,7 @@ import {
   attachAutocomplete,
   renderStats,
   renderResult,
+  renderWrongGuesses,
 } from "./ui.js";
 
 const els = {
@@ -49,6 +50,7 @@ const els = {
   hintBtn: document.getElementById("hintBtn"),
   giveUpBtn: document.getElementById("giveUpBtn"),
   hintLog: document.getElementById("hintLog"),
+  wrongGuesses: document.getElementById("wrongGuesses"),
   mapContainer: document.getElementById("mapContainer"),
   modeClassicBtn: document.getElementById("modeClassicBtn"),
   modeUnlimitedBtn: document.getElementById("modeUnlimitedBtn"),
@@ -150,6 +152,7 @@ function renderActiveGameView() {
   if (mode === "classic") els.dailyNumber.textContent = `Daily #${puzzleNumber(currentDailyKey)}`;
 
   renderRouteChain(els, activeGame);
+  renderWrongGuesses(els, activeGame);
   clearFeedback(els);
   els.hintLog.textContent = "";
   els.countryInput.value = "";
@@ -172,6 +175,7 @@ function serializeGame(g) {
     destCode: g.destCode,
     slots: g.slots,
     guessedCodes: [...g.guessedCodes],
+    wrongGuesses: [...g.wrongGuesses],
     acceptedGuesses: g.acceptedGuesses,
     hintsUsed: g.hintsUsed,
     status: g.status,
@@ -184,6 +188,7 @@ function restoreGame(g, saved) {
   g.start(saved.startCode, saved.destCode); // deterministic: same pair, fresh distances
   g.slots = saved.slots.slice();
   g.guessedCodes = new Set(saved.guessedCodes);
+  g.wrongGuesses = new Set(saved.wrongGuesses || []);
   g.acceptedGuesses = saved.acceptedGuesses;
   g.hintsUsed = saved.hintsUsed;
   g.status = saved.status;
@@ -368,21 +373,21 @@ function submitMove(rawValue) {
       renderFeedback(els, `❌ "${result.input}" isn't a recognized country.`, "err");
     } else if (result.reason === "is-start") {
       renderFeedback(els, `❌ ${activeGame.countryName(result.code)} is your starting country.`, "err");
-    } else if (result.reason === "already-found") {
-      renderFeedback(els, `❌ You've already found ${activeGame.countryName(result.code)}.`, "err");
-    } else if (result.reason === "too-early") {
-      const plural = result.remaining === 1 ? "country" : "countries";
+    } else if (result.reason === "is-dest") {
       renderFeedback(
         els,
-        `❌ Not yet — you still need to find ${result.remaining} more ${plural} before ${activeGame.countryName(result.code)} is reachable.`,
+        `❌ ${activeGame.countryName(result.code)} is your destination — find everything in between and you'll reach it automatically.`,
         "err"
       );
+    } else if (result.reason === "already-found") {
+      renderFeedback(els, `❌ You've already found ${activeGame.countryName(result.code)}.`, "err");
     } else if (result.reason === "not-on-path") {
       renderFeedback(
         els,
         `❌ ${activeGame.countryName(result.code)} isn't on the shortest route between ${activeGame.countryName(activeGame.startCode)} and ${activeGame.countryName(activeGame.destCode)}.`,
         "err"
       );
+      renderWrongGuesses(els, activeGame);
     }
     if (mode === "classic") persistDaily();
     return;
@@ -414,11 +419,10 @@ els.moveForm.addEventListener("submit", (e) => {
 els.hintBtn.addEventListener("click", () => {
   const hint = activeGame.hint();
   if (!hint) return;
-  const plural = hint.remaining === 1 ? "country" : "countries";
   els.hintLog.textContent =
     hint.remaining === 0
-      ? `💡 You've found them all — enter the destination to finish. (−15 pts)`
-      : `💡 You still need to find ${hint.remaining} more ${plural}. (−15 pts)`;
+      ? `💡 Every step is found — the route will complete on its own. (−15 pts)`
+      : `💡 Step ${hint.stepNumber} of ${activeGame.slotCount} is in ${hint.region}. (−15 pts)`;
   if (mode === "classic") persistDaily();
 });
 
@@ -477,6 +481,7 @@ function beginCustomChallenge() {
   els.modeCustomBtn.setAttribute("aria-pressed", "true");
   syncNewGameButton();
   renderActiveGameView();
+  if (activeGame.status !== "playing") showCompletedResult(activeGame.result());
 }
 
 els.customStartBtn.addEventListener("click", beginCustomChallenge);

@@ -76,6 +76,25 @@ export function clearFeedback(els) {
   els.feedback.innerHTML = "";
 }
 
+/** Countries the player has guessed that turned out not to be on the
+ * shortest route — a running "already tried, don't bother again" list. */
+export function renderWrongGuesses(els, game) {
+  els.wrongGuesses.innerHTML = "";
+  if (!game.wrongGuesses || game.wrongGuesses.size === 0) return;
+
+  const label = document.createElement("span");
+  label.className = "wrong-guesses-label";
+  label.textContent = "Ruled out:";
+  els.wrongGuesses.appendChild(label);
+
+  for (const code of game.wrongGuesses) {
+    const chip = document.createElement("span");
+    chip.className = "wrong-guess-chip";
+    chip.textContent = `${flagEmoji(code)} ${game.countryName(code)}`;
+    els.wrongGuesses.appendChild(chip);
+  }
+}
+
 /** Wires an input + suggestions box to live-filter countries. Returns
  * a controller with `.getSelection()` clearing on pick, and `.reset()`. */
 export function attachAutocomplete(input, box, { onSelect, excludeCodes = () => [] } = {}) {

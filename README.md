@@ -17,7 +17,12 @@ displayed route is always shown in order regardless of the order it was
 discovered in. Guessing something that *isn't* on any shortest route (e.g.
 `Brazil`) is simply rejected — there's no way to "detour" onto a longer
 valid path, since only path membership is checked, not adjacency to
-wherever the player currently is.
+wherever the player currently is. Wrong guesses are tracked in a "ruled
+out" list so the player never has to remember what they already tried.
+
+The destination itself is never something you type — the moment every
+intermediate step is found (`United States` *and* `Mexico`, here), the
+route completes automatically.
 
 ## Running it
 
@@ -101,8 +106,8 @@ touching the graph or the data.
 
 Defined in `scoreFor()` in `js/game.js`. "Moves" here means total accepted
 guesses — every correct find, including a redundant one (see below) — plus
-the final destination entry, so a flawless run costs exactly the optimal
-move count, same as before this counted order-independent guesses:
+one automatic move for the final, un-typed hop onto the destination, so a
+flawless run costs exactly the optimal move count:
 
 - Perfect (optimal) route: **100 points**
 - Each extra move beyond optimal: **−10 points**
@@ -116,6 +121,18 @@ It's accepted (it's not wrong), but it doesn't advance progress and counts
 against efficiency like an extra move would.
 
 Efficiency is reported as `optimal moves / player moves`, as a percentage.
+
+## Hints and wrong guesses
+
+A hint (`Game#hint()`) reveals the `region` (a coarse tag on each country
+in `js/data.js` — "Southeast Asia", "West Africa", etc., used only for
+this) of the earliest still-unfound step — concrete enough to actually
+narrow things down, without naming the country. Each use costs 15 points.
+
+Any guess that resolves to a real country but isn't on the shortest route
+is added to `Game#wrongGuesses` and shown in a persistent "Ruled out" list
+in the UI, so the player is never stuck re-guessing something they've
+already tried.
 
 ## Difficulty
 

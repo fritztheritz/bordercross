@@ -55,9 +55,15 @@
             <option value="medium">Medium</option>
             <option value="hard">Hard</option>
           </select>
+          <select id="restrictionsPicker" class="difficulty-picker" aria-label="Unlimited mode restrictions" hidden>
+            <option value="random">Restrictions: Random</option>
+            <option value="off">Restrictions: Off</option>
+            <option value="on">Restrictions: On</option>
+          </select>
           <button type="button" class="btn btn-primary" id="newGameBtn">New Game</button>
         </div>
         <div class="icon-buttons">
+          <button type="button" class="icon-btn" id="achievementsBtn" title="Achievements" aria-label="Achievements">🏅</button>
           <button type="button" class="icon-btn" id="statsBtn" title="Statistics" aria-label="Statistics">📊</button>
           <button type="button" class="icon-btn" id="howToBtn" title="How to play" aria-label="How to play">?</button>
           <button type="button" class="icon-btn" id="soundBtn" title="Toggle sound" aria-label="Toggle sound">🔊</button>
@@ -155,14 +161,15 @@
 
       <div class="rule-block sea">
         <div class="rule-title">Restrictions</div>
-        <p class="muted">Some short-to-medium runs in Classic and Unlimited come with one or two countries banned from the route entirely — shown up front as "🚫 Off-limits for this route," never a surprise. The optimal route already routes around them, so the move count and every hint account for the detour. Restrictions are chosen from countries that actually sat on the direct route, so they always force a real reroute rather than banning somewhere irrelevant — and only on routes short enough that the detour is something you can actually reason about, not a random blocker dropped on an already-sprawling path.</p>
+        <p class="muted">Some short-to-medium runs in Classic and Unlimited come with one or two countries banned from the route entirely — shown up front as "🚫 Off-limits for this route," never a surprise. The optimal route already routes around them, so the move count and every hint account for the detour. Restrictions are chosen from countries that actually sat on the direct route, so they always force a real reroute rather than banning somewhere irrelevant — and only on routes short enough that the detour is something you can actually reason about, not a random blocker dropped on an already-sprawling path. In Unlimited, the dropdown next to the difficulty picker lets you force restrictions on or off instead of leaving it to the usual chance.</p>
       </div>
 
       <div class="rule-block land">
         <div class="rule-title">Game modes</div>
-        <p class="muted"><strong>Classic</strong> is a daily challenge — one fixed start/destination pair, the same for everyone, that refreshes at midnight in your local timezone. <strong>Unlimited</strong> generates a fresh random pair every time you press New Game, and lets you pick a target difficulty from the dropdown next to the mode switcher. <strong>Custom</strong> lets you pick both countries yourself — Custom runs never have restrictions, since you're already choosing the challenge.</p>
+        <p class="muted"><strong>Classic</strong> is a daily challenge — one fixed start/destination pair, the same for everyone, that refreshes at midnight in your local timezone. <strong>Unlimited</strong> generates a fresh random pair every time you press New Game, and lets you pick a target difficulty and whether restrictions apply from the dropdowns next to the mode switcher. <strong>Custom</strong> lets you pick both countries yourself — Custom runs never have restrictions, since you're already choosing the challenge.</p>
       </div>
       <p class="muted">After finishing a run, <strong>Share Result</strong> copies (or opens your share sheet with) a spoiler-free summary — flags, move count, and a row of squares, no country names — so you can compare with friends over text.</p>
+      <p class="muted">The 🏅 icon in the top bar tracks <strong>Achievements</strong> — small milestones unlocked from your stats and streak, like completing a Hard route with no hints or reaching a 7-day streak.</p>
     </div>
   </div>
 
@@ -180,6 +187,16 @@
       <div class="modal-actions">
         <button type="button" class="btn btn-ghost" id="resetStatsBtn">Reset statistics</button>
       </div>
+    </div>
+  </div>
+
+  <!-- Achievements -->
+  <div class="modal-backdrop" id="achievementsModal" hidden>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="achievementsTitle">
+      <div class="modal-close-row"><button class="icon-btn" data-close="achievementsModal" aria-label="Close">✕</button></div>
+      <h2 id="achievementsTitle">Achievements</h2>
+      <p class="muted" id="achievementsProgress"></p>
+      <div class="achievements-grid" id="achievementsGrid"></div>
     </div>
   </div>
 

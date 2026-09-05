@@ -4,6 +4,7 @@
 import { flagEmoji, searchCountries } from "./lookup.js";
 import { difficultyFor } from "./graph.js";
 import { averageMoves, averageEfficiency, formatTime, DISTRIBUTION_BUCKETS } from "./stats.js";
+import { ACHIEVEMENTS } from "./achievements.js";
 
 const DISTRIBUTION_LABELS = { "0": "Perfect", "1": "+1", "2": "+2", "3": "+3", "4+": "+4 or more" };
 
@@ -233,6 +234,49 @@ export function renderMoveDistribution(container, stats) {
     `;
     container.appendChild(row);
   });
+}
+
+/** Every achievement, unlocked ones in full color, locked ones dimmed but
+ * still showing their icon/title/description — knowing what you're
+ * working toward is more motivating than a mystery box. */
+export function renderAchievements(grid, progressEl, unlockedIds) {
+  grid.innerHTML = "";
+  let unlockedCount = 0;
+  for (const achievement of ACHIEVEMENTS) {
+    const isUnlocked = unlockedIds.has(achievement.id);
+    if (isUnlocked) unlockedCount++;
+    const tile = document.createElement("div");
+    tile.className = `achievement-tile ${isUnlocked ? "unlocked" : "locked"}`;
+    tile.innerHTML = `
+      <div class="achievement-icon">${achievement.icon}</div>
+      <div class="achievement-title">${achievement.title}</div>
+      <div class="achievement-desc">${achievement.description}</div>
+    `;
+    grid.appendChild(tile);
+  }
+  progressEl.textContent = `${unlockedCount} / ${ACHIEVEMENTS.length} unlocked`;
+}
+
+/** Appends a "just unlocked" callout to the result modal — only for
+ * achievements earned by *this* game, never on a restored/replayed one. */
+export function renderNewAchievements(container, newlyUnlocked) {
+  if (!newlyUnlocked || newlyUnlocked.length === 0) return;
+  const wrap = document.createElement("div");
+  wrap.className = "achievement-unlock-list";
+  for (const achievement of newlyUnlocked) {
+    const row = document.createElement("div");
+    row.className = "achievement-unlock-row";
+    row.innerHTML = `
+      <span class="achievement-unlock-icon">${achievement.icon}</span>
+      <span>
+        <span class="achievement-unlock-label">Achievement unlocked</span>
+        <strong>${achievement.title}</strong>
+        <span class="muted">— ${achievement.description}</span>
+      </span>
+    `;
+    wrap.appendChild(row);
+  }
+  container.appendChild(wrap);
 }
 
 function restrictionsRecap(game) {

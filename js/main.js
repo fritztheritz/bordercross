@@ -26,6 +26,7 @@ import {
 import { buildShareText, shareResult } from "./share.js";
 import { soundEnabled, setSoundEnabled, playFound, playWrong, playWin } from "./sound.js";
 import { burstConfetti } from "./confetti.js";
+import { loadUnlocked, checkAchievements, resetAchievements } from "./achievements.js";
 import {
   renderTicket,
   renderRouteChain,
@@ -37,6 +38,8 @@ import {
   renderResult,
   renderWrongGuesses,
   renderRestrictions,
+  renderAchievements,
+  renderNewAchievements,
 } from "./ui.js";
 
 const els = {
@@ -63,7 +66,9 @@ const els = {
   modeUnlimitedBtn: document.getElementById("modeUnlimitedBtn"),
   modeCustomBtn: document.getElementById("modeCustomBtn"),
   difficultyPicker: document.getElementById("difficultyPicker"),
+  restrictionsPicker: document.getElementById("restrictionsPicker"),
   newGameBtn: document.getElementById("newGameBtn"),
+  achievementsBtn: document.getElementById("achievementsBtn"),
   statsBtn: document.getElementById("statsBtn"),
   howToBtn: document.getElementById("howToBtn"),
   soundBtn: document.getElementById("soundBtn"),
@@ -71,6 +76,8 @@ const els = {
   statsGrid: document.getElementById("statsGrid"),
   moveDistribution: document.getElementById("moveDistribution"),
   resetStatsBtn: document.getElementById("resetStatsBtn"),
+  achievementsGrid: document.getElementById("achievementsGrid"),
+  achievementsProgress: document.getElementById("achievementsProgress"),
   resultHeadline: document.getElementById("resultHeadline"),
   resultBody: document.getElementById("resultBody"),
   dailyNextNote: document.getElementById("dailyNextNote"),
@@ -190,11 +197,43 @@ function unlimitedRange() {
   return DIFFICULTY_RANGES[els.difficultyPicker.value] || DIFFICULTY_RANGES.any;
 }
 
-/** Generates a fresh Unlimited pair and starts it, rolling the same
- * chance of restrictions the daily challenge gets (just unseeded). */
+const RESTRICTIONS_PICKER_KEY = "bordercross.unlimitedRestrictions";
+
+(function initRestrictionsPicker() {
+  try {
+    const stored = localStorage.getItem(RESTRICTIONS_PICKER_KEY);
+    if (stored) els.restrictionsPicker.value = stored;
+  } catch {}
+})();
+
+els.restrictionsPicker.addEventListener("change", () => {
+  try {
+    localStorage.setItem(RESTRICTIONS_PICKER_KEY, els.restrictionsPicker.value);
+  } catch {}
+});
+
+/** Generates a fresh Unlimited pair and starts it. Restrictions follow
+ * the picker: "random" rolls the same chance the daily challenge gets
+ * (just unseeded), "off" never applies one, and "on" retries with fresh
+ * pairs until one actually supports a restriction (see pickRestrictions'
+ * own eligibility rules in game.js) rather than silently giving up. */
 function startNewUnlimitedGame() {
-  const [start, dest] = randomPair(graph, unlimitedRange());
-  const restrictedCodes = pickRestrictions(graph, start, dest);
+  const restrictionMode = els.restrictionsPicker.value;
+  let start;
+  let dest;
+  let restrictedCodes = [];
+
+  if (restrictionMode === "on") {
+    for (let attempt = 0; attempt < 20; attempt++) {
+      [start, dest] = randomPair(graph, unlimitedRange());
+      restrictedCodes = pickRestrictions(graph, start, dest, Math.random, { chance: 1 });
+      if (restrictedCodes.length > 0) break;
+    }
+  } else {
+    [start, dest] = randomPair(graph, unlimitedRange());
+    if (restrictionMode !== "off") restrictedCodes = pickRestrictions(graph, start, dest);
+  }
+
   games.unlimited.start(start, dest, { restrictedCodes });
 }
 
@@ -321,6 +360,7 @@ function setMode(next) {
   els.modeUnlimitedBtn.setAttribute("aria-pressed", String(mode === "unlimited"));
   els.modeCustomBtn.setAttribute("aria-pressed", String(mode === "custom"));
   els.difficultyPicker.hidden = mode !== "unlimited";
+  els.restrictionsPicker.hidden = mode !== "unlimited";
 
   syncNewGameButton();
 
@@ -373,8 +413,9 @@ function finishGame(result) {
     persistDaily();
     recordDailyOutcome(currentDailyKey, result.status === "won");
   }
-  recordResult(result);
-  showResultModal(result);
+  const stats = recordResult(result);
+  const newlyUnlocked = checkAchievements({ stats, streak: loadStreakStats(), game: activeGame, result });
+  showResultModal(result, newlyUnlocked);
   if (result.status === "won") {
     playWin(result.perfect);
     burstConfetti(els.confettiLayer);
@@ -382,14 +423,16 @@ function finishGame(result) {
 }
 
 /** Used when restoring an already-completed daily puzzle — shows the same
- * modal without double-recording stats. */
+ * modal without double-recording stats (and without re-announcing
+ * achievements already unlocked in a previous session). */
 function showCompletedResult(result) {
   showResultModal(result);
 }
 
-function showResultModal(result) {
+function showResultModal(result, newlyUnlocked = []) {
   lastResult = result;
   renderResult(els, activeGame, result);
+  renderNewAchievements(els.resultBody, newlyUnlocked);
   els.countryInput.disabled = true;
   els.hintBtn.disabled = true;
   els.giveUpBtn.disabled = true;
@@ -527,10 +570,15 @@ els.statsBtn.addEventListener("click", () => {
 els.resetStatsBtn.addEventListener("click", () => {
   if (!confirm("Reset all statistics? This can't be undone.")) return;
   const stats = resetStats();
+  resetAchievements();
   renderStats(els.statsGrid, stats, loadStreakStats());
   renderMoveDistribution(els.moveDistribution, stats);
 });
 els.howToBtn.addEventListener("click", () => openModal("howToModal"));
+els.achievementsBtn.addEventListener("click", () => {
+  renderAchievements(els.achievementsGrid, els.achievementsProgress, loadUnlocked());
+  openModal("achievementsModal");
+});
 
 // ---------- Custom mode ----------
 
@@ -568,6 +616,7 @@ function beginCustomChallenge() {
   els.modeUnlimitedBtn.setAttribute("aria-pressed", "false");
   els.modeCustomBtn.setAttribute("aria-pressed", "true");
   els.difficultyPicker.hidden = true;
+  els.restrictionsPicker.hidden = true;
   syncNewGameButton();
   renderActiveGameView();
   if (activeGame.status !== "playing") showCompletedResult(activeGame.result());

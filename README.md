@@ -98,6 +98,7 @@ js/graph.js          Graph construction, BFS shortest-path, difficulty
 js/lookup.js         Name normalization, alias matching, autocomplete search
 js/game.js           Game state machine + scoring (no DOM dependency)
 js/stats.js          localStorage-backed player statistics
+js/achievements.js   Achievement definitions + unlock tracking (localStorage)
 js/map.js            Leaflet route-map rendering (pan/zoom, no political borders)
 js/daily.js          Deterministic daily puzzle (seeded PRNG) + its localStorage persistence
 js/share.js          Wordle-style spoiler-free share text + native share/clipboard
@@ -194,7 +195,12 @@ never loses progress in the other two.
   This is what Classic mode did before the daily challenge existed. A
   difficulty dropdown next to the mode switcher narrows the range
   `randomPair()` draws from — Any (2–14 moves), Easy (2–4), Medium (5–9),
-  or Hard (10–20) — and the choice is remembered in `localStorage`.
+  or Hard (10–20) — and the choice is remembered in `localStorage`. A
+  second dropdown next to it (Restrictions: Random / Off / On) overrides
+  the usual chance-based roll described below — "Off" always plays
+  unrestricted, "On" retries fresh pairs (up to 20 attempts) until one
+  actually supports a restriction, and "Random" is the original 35%-chance
+  behavior. Also remembered in `localStorage`.
 - **Custom** — pick your own start and destination. Never gets
   restrictions (see below) — you're already choosing the challenge.
 
@@ -223,6 +229,40 @@ banning them makes "shortest" absurd), the run plays unrestricted instead.
 The daily challenge rolls its restrictions from a seed independent of the
 pair-selection one, so every player sees the same (or same lack of)
 restriction each day without the two draws perturbing each other.
+
+## Achievements
+
+12 small unlockable milestones (`js/achievements.js`), tracked behind the
+🏅 icon in the topbar. Each definition is just a `check(ctx)` predicate run
+against a snapshot of data that already exists — persisted stats, streak,
+the `Game` instance just finished, and its result — so unlocking never
+requires any new gameplay tracking of its own:
+
+| Achievement | Requirement |
+|---|---|
+| 🎉 First Crossing | Win your first route |
+| 🏆 Perfect Route | Complete a route with zero wasted moves |
+| 🎯 Precision Navigator | Complete 10 perfect routes |
+| 🌍 Globetrotter | Win a Hard-difficulty route |
+| 🥾 Marathoner | Complete a route of 10+ moves |
+| 🧭 Iron Will | Win a Hard route without using a hint |
+| 🚧 Detour Master | Win a route with a restriction in play |
+| 🔥 On a Roll | Reach a 3-day streak |
+| 🔥 Weekly Regular | Reach a 7-day streak |
+| 🔥 Creature of Habit | Reach a 30-day streak |
+| ✈️ Frequent Flyer | Play 25 games |
+| 🗺️ World Traveler | Play 100 games |
+
+Unlocked ids persist in `localStorage`, independent of the stats they read
+from — resetting statistics also resets achievements, since most of the
+predicates above would otherwise become permanently un-revocable facts
+about play that no longer matches what Statistics shows. A newly-unlocked
+achievement is only surfaced once, as a small callout in the result modal
+at the moment it's actually earned (`checkAchievements()` returns just the
+ones unlocked *by that call*) — restoring an already-completed daily
+puzzle, or replaying a stat check, never re-announces one you already have.
+The Achievements modal itself always shows the full set, locked tiles
+dimmed and grayscaled, with an unlocked-count progress line at the top.
 
 ## Sharing a result
 

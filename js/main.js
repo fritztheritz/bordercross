@@ -1,4 +1,4 @@
-// Bordercross — wiring. Builds the graph once, then drives Game + RouteMap
+// BorderCross — wiring. Builds the graph once, then drives Game + RouteMap
 // from DOM events and renders through ui.js.
 //
 // Three modes share the same graph/scoring engine but each get their own

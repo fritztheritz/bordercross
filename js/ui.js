@@ -1,4 +1,4 @@
-// Bordercross — DOM rendering helpers. Pure-ish: given state + elements,
+// BorderCross — DOM rendering helpers. Pure-ish: given state + elements,
 // update the page. Event wiring lives in main.js.
 
 import { flagEmoji, searchCountries } from "./lookup.js";

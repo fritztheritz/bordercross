@@ -1,4 +1,4 @@
-// Bordercross — game state machine and scoring.
+// BorderCross — game state machine and scoring.
 //
 // This module has no DOM dependency: it only knows about the graph and
 // the rules. ui.js drives it and renders the results.

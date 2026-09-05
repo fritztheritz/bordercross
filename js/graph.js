@@ -1,4 +1,4 @@
-// Bordercross — connection graph + shortest-path logic
+// BorderCross — connection graph + shortest-path logic
 //
 // The graph is built once from data.js and is the single source of truth
 // both for validating a player's moves and for computing the "optimal"

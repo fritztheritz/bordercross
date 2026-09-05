@@ -1,4 +1,4 @@
-// Bordercross — local statistics tracking.
+// BorderCross — local statistics tracking.
 //
 // Stored entirely in localStorage; no account required. The shape here is
 // deliberately flat so a future accounts/database layer can sync the same

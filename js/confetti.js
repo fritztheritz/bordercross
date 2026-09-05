@@ -1,4 +1,4 @@
-// Bordercross — a small CSS-only confetti burst for winning. No canvas,
+// BorderCross — a small CSS-only confetti burst for winning. No canvas,
 // no library: a handful of absolutely-positioned pieces that fall and
 // remove themselves. Skipped entirely under prefers-reduced-motion.
 

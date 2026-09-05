@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 56" width="360" height="56" role="img" aria-labelledby="bcLockupTitle">
+  <title id="bcLockupTitle">BorderCross</title>
+  <rect x="2" y="2" width="52" height="52" rx="15" fill="#12181f"/>
+  <path d="M15.5 36.5 Q26.5 26.5 36.5 15.5" fill="none" stroke="#d9a441" stroke-width="3.7" stroke-linecap="round"/>
+  <circle cx="15.5" cy="36.5" r="7.3" fill="#2b8c82" stroke="#12181f" stroke-width="1.6"/>
+  <circle cx="36.5" cy="15.5" r="7.3" fill="#3e9b6f" stroke="#12181f" stroke-width="1.6"/>
+  <text x="70" y="39" font-family="Fraunces, Georgia, 'Times New Roman', serif" font-weight="700" font-size="34" letter-spacing="-0.5" fill="#12181f">BorderCross</text>
+</svg>

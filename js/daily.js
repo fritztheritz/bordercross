@@ -1,4 +1,4 @@
-// Bordercross — the daily challenge.
+// BorderCross — the daily challenge.
 //
 // Classic mode is a single, fixed puzzle per calendar day (in the
 // player's own local timezone), the same for every player on that day —

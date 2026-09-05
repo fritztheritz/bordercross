@@ -95,7 +95,11 @@ button {
   padding-bottom: 16px;
 }
 
-.brand { display: flex; flex-direction: column; gap: 2px; }
+.brand { display: flex; flex-direction: column; gap: 4px; }
+
+.brand-lockup { display: flex; align-items: center; gap: 12px; }
+
+.brand-icon { flex-shrink: 0; border-radius: 28%; }
 
 .brand-name {
   font-family: "Fraunces", Georgia, serif;

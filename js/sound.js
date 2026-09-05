@@ -1,4 +1,4 @@
-// Bordercross — tiny synthesized sound effects via the Web Audio API.
+// BorderCross — tiny synthesized sound effects via the Web Audio API.
 // No audio assets to ship: every sound here is a couple of oscillator
 // tones, generated on the fly and gone in a fraction of a second.
 

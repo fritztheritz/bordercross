@@ -1,4 +1,6 @@
-# Bordercross
+# BorderCross
+
+<img src="assets/logo-lockup.svg" alt="BorderCross" width="280">
 
 **Play it live: [fritztheritz.github.io/bordercross](https://fritztheritz.github.io/bordercross/)**
 
@@ -103,6 +105,7 @@ js/sound.js          Synthesized sound effects (Web Audio API, no assets)
 js/confetti.js       CSS-only confetti burst for winning
 js/ui.js             DOM rendering helpers
 js/main.js           Event wiring / bootstrapping (three Game instances, one per mode)
+assets/              Logo/favicon SVGs (see "Brand assets" below)
 ```
 
 Each layer only talks to the ones below it, so e.g. the scoring formula in
@@ -192,7 +195,7 @@ desktop (`js/share.js`). A Classic/daily result includes the puzzle
 number so people can compare the same day's puzzle:
 
 ```
-Bordercross #247 🇸🇬 → 🇧🇿
+BorderCross #247 🇸🇬 → 🇧🇿
 🏆 Perfect — 8/8 moves
 🟩🟩🟩🟩🟩🟩🟩🟩
 Score: 100
@@ -259,3 +262,16 @@ no canvas or library) inside the result modal on a win; each piece
 removes itself when its own animation ends. Skipped entirely under
 `prefers-reduced-motion: reduce`, along with the modal's small pop-in
 animation on the score and headline.
+
+## Brand assets
+
+Hand-authored SVGs in `assets/` — no image generator involved, just
+shapes drawn in the same palette as the rest of the app. The mark itself
+is two pins joined by a route line: teal start, gold journey, green
+arrival — literally the game's own map-marker colors (`js/map.js`).
+
+| File | Use |
+|---|---|
+| `logo-icon.svg` | Square mark on its own dark badge. Used as the site favicon and next to the wordmark in the header. |
+| `logo-icon-mono.svg` | Same mark, no badge, `currentColor` fill/stroke — for inlining (not `<img>`, which can't see page CSS) anywhere a single flat color is needed. |
+| `logo-lockup.svg` / `logo-lockup-dark.svg` | Icon + "BorderCross" wordmark (real text, not outlined — `Fraunces` if the viewer has it loaded, `Georgia` otherwise) for light/dark banners. |

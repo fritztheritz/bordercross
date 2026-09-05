@@ -1,4 +1,4 @@
-// Bordercross — geographic dataset
+// BorderCross — geographic dataset
 //
 // COUNTRIES: [isoAlpha2, name, lat, lon, region, aliases[]]
 //   lat/lon are approximate centroids, used for the route map and as a

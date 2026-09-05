@@ -1,4 +1,4 @@
-// Bordercross — route map rendering, backed by Leaflet.
+// BorderCross — route map rendering, backed by Leaflet.
 //
 // The base layer is a physical/terrain basemap with no political borders
 // or country labels baked in — on purpose, so the map itself never gives

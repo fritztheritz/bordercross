@@ -1,4 +1,4 @@
-// Bordercross — country name search, normalization, and flag rendering.
+// BorderCross — country name search, normalization, and flag rendering.
 
 import { COUNTRIES } from "./data.js";
 

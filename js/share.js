@@ -1,4 +1,4 @@
-// Bordercross — Wordle-style shareable result text.
+// BorderCross — Wordle-style shareable result text.
 //
 // The share text never contains country names — only flags, numbers, and
 // a row of squares — so sharing a result can't spoil the puzzle for
@@ -16,8 +16,8 @@ export function buildShareText(game, result, opts = {}) {
   const dest = flagEmoji(game.destCode);
   const header =
     opts.puzzleNumber != null
-      ? `Bordercross #${opts.puzzleNumber} ${start} → ${dest}`
-      : `Bordercross ${start} → ${dest}`;
+      ? `BorderCross #${opts.puzzleNumber} ${start} → ${dest}`
+      : `BorderCross ${start} → ${dest}`;
 
   let statusLine;
   let squares;

@@ -158,7 +158,7 @@ export function attachAutocomplete(input, box, { onSelect, excludeCodes = () => 
   return { close };
 }
 
-export function renderStats(grid, stats) {
+export function renderStats(grid, stats, streak) {
   const tiles = [
     ["Games played", stats.gamesPlayed],
     ["Games won", stats.gamesWon],
@@ -169,6 +169,10 @@ export function renderStats(grid, stats) {
     ["Longest route completed", stats.longestRouteCompleted || "—"],
     ["Fastest completion", formatTime(stats.fastestTimeMs)],
   ];
+  if (streak) {
+    tiles.push(["Daily streak", streak.current ? `🔥 ${streak.current}` : 0]);
+    tiles.push(["Best daily streak", streak.max]);
+  }
   grid.innerHTML = "";
   for (const [label, value] of tiles) {
     const tile = document.createElement("div");

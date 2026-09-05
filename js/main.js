@@ -12,7 +12,7 @@ import { buildGraph, COUNTRY_BY_CODE } from "./graph.js";
 import { Game, randomPair } from "./game.js";
 import { RouteMap } from "./map.js";
 import { resolveCountry } from "./lookup.js";
-import { loadStats, recordResult, resetStats } from "./stats.js";
+import { loadStats, recordResult, resetStats, recordDailyOutcome, loadStreakStats } from "./stats.js";
 import {
   todayKey,
   puzzleNumber,
@@ -307,7 +307,10 @@ els.playAgainBtn.addEventListener("click", () => {
 // ---------- Finishing a game ----------
 
 function finishGame(result) {
-  if (mode === "classic") persistDaily();
+  if (mode === "classic") {
+    persistDaily();
+    recordDailyOutcome(currentDailyKey, result.status === "won");
+  }
   recordResult(result);
   showResultModal(result);
 }
@@ -328,7 +331,9 @@ function showResultModal(result) {
   els.playAgainBtn.hidden = mode === "classic";
   els.dailyNextNote.hidden = mode !== "classic";
   if (mode === "classic") {
-    els.dailyNextNote.textContent = `Next daily puzzle in ${formatCountdown(msUntilNextMidnight())}.`;
+    const streak = loadStreakStats();
+    const streakText = streak.current > 0 ? `🔥 ${streak.current}-day streak` : "Streak reset — start a new one tomorrow";
+    els.dailyNextNote.textContent = `${streakText} · Next daily puzzle in ${formatCountdown(msUntilNextMidnight())}.`;
   }
 
   els.shareBtn.textContent = "Share Result";
@@ -339,6 +344,7 @@ els.shareBtn.addEventListener("click", async () => {
   if (!lastResult) return;
   const text = buildShareText(activeGame, lastResult, {
     puzzleNumber: mode === "classic" ? puzzleNumber(currentDailyKey) : null,
+    url: location.origin + location.pathname,
   });
   const outcome = await shareResult(text);
   if (outcome === "copied") {
@@ -436,12 +442,12 @@ els.giveUpBtn.addEventListener("click", () => {
 // ---------- Stats ----------
 
 els.statsBtn.addEventListener("click", () => {
-  renderStats(els.statsGrid, loadStats());
+  renderStats(els.statsGrid, loadStats(), loadStreakStats());
   openModal("statsModal");
 });
 els.resetStatsBtn.addEventListener("click", () => {
   if (!confirm("Reset all statistics? This can't be undone.")) return;
-  renderStats(els.statsGrid, resetStats());
+  renderStats(els.statsGrid, resetStats(), loadStreakStats());
 });
 els.howToBtn.addEventListener("click", () => openModal("howToModal"));
 

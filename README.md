@@ -1,5 +1,7 @@
 # Bordercross
 
+**Play it live: [fritztheritz.github.io/bordercross](https://fritztheritz.github.io/bordercross/)**
+
 Given a starting country and a destination, name every country that sits
 on the shortest possible route between them — in any order.
 
@@ -27,7 +29,7 @@ The destination itself is never something you type — the moment every
 intermediate step is found (`United States` *and* `Mexico`, here), the
 route completes automatically.
 
-## Running it
+## Running it locally
 
 No build step. Because the app uses native ES modules (`import`/`export`),
 it needs to be served over HTTP rather than opened as a `file://` URL:
@@ -190,6 +192,7 @@ Bordercross #247 🇸🇬 → 🇧🇿
 🏆 Perfect — 8/8 moves
 🟩🟩🟩🟩🟩🟩🟩🟩
 Score: 100
+https://fritztheritz.github.io/bordercross/
 ```
 
 ## The map
@@ -220,3 +223,12 @@ Tracked locally via `localStorage` (`js/stats.js`): games played/won,
 best score, average moves, average efficiency, perfect routes, longest
 completed route, and fastest completion time. No account required; the
 storage shape is flat so a real backend could sync the same fields later.
+
+### Daily streak
+
+Tracked separately (`recordDailyOutcome()` in `js/stats.js`) since it only
+applies to the Classic daily challenge — Unlimited and Custom runs don't
+touch it. Winning on the calendar day right after your last completed day
+extends the streak; missing a day, or giving up, resets it to 0. Shown in
+the result modal right after a Classic finish and as two tiles ("Daily
+streak" / "Best daily streak") in the Statistics panel.

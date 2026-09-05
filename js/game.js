@@ -53,18 +53,18 @@ export class Game {
     this.slots = new Array(this.slotCount).fill(null);
     this.guessedCodes = new Set();
     this.wrongGuesses = new Set(); // guesses that resolved to a real country, but aren't on any shortest path
-    this.acceptedGuesses = 0; // slot fills + redundant valid alternates
+    this.totalMoves = 0; // every guess that "costs" something: slot fills, wrong guesses, redundant alternates
     this.hintsUsed = 0;
     this.startedAt = null;
     this.finishedAt = null;
     this.status = "playing"; // "playing" | "won" | "gaveup"
 
     // Start and destination already directly connected — nothing to find.
-    // acceptedGuesses is still set to 1 (matching optimalMoves) so scoring
-    // and the "perfect route" check stay consistent with every other case.
+    // totalMoves is still set to 1 (matching optimalMoves) so scoring and
+    // the "perfect route" check stay consistent with every other case.
     if (this.slotCount === 0) {
       this.status = "won";
-      this.acceptedGuesses = 1;
+      this.totalMoves = 1;
       this.startedAt = this.finishedAt = Date.now();
     }
     return this;
@@ -91,7 +91,15 @@ export class Game {
 
   /** Result shape varies by outcome — see call sites in main.js. The
    * destination is never a guess: the game recognizes the route as
-   * complete automatically the moment the last intermediate slot fills. */
+   * complete automatically the moment the last intermediate slot fills.
+   *
+   * A wrong guess (a real country that isn't on any shortest path) still
+   * costs a move, same as a redundant one — otherwise a run full of wild
+   * guesses could still land "100% efficient" just by eventually finding
+   * every step. Trivial slips (re-typing the start, guessing the
+   * destination before it's reachable, repeating a find, or a typo that
+   * doesn't resolve to any country) don't cost anything — they're not
+   * really guesses about the puzzle. */
   attemptMove(rawInput) {
     if (this.status !== "playing") return { ok: false, reason: "not-playing" };
     if (this.startedAt == null) this.startedAt = Date.now();
@@ -107,11 +115,12 @@ export class Game {
     const layer = this.layerOf(code);
     if (layer == null) {
       this.wrongGuesses.add(code);
+      this.totalMoves += 1;
       return { ok: false, reason: "not-on-path", code };
     }
 
     this.guessedCodes.add(code);
-    this.acceptedGuesses += 1;
+    this.totalMoves += 1;
     const slotIndex = layer - 1;
     const isNewSlot = this.slots[slotIndex] == null;
     if (isNewSlot) this.slots[slotIndex] = code;
@@ -120,7 +129,7 @@ export class Game {
       // The final hop onto the destination is automatic, but still counts
       // as a move — otherwise a flawless run would tally one move short of
       // optimalMoves and never register as "perfect".
-      this.acceptedGuesses += 1;
+      this.totalMoves += 1;
       this.status = "won";
       this.finishedAt = Date.now();
       return { ok: true, code, slotIndex, isNewSlot, remaining: 0, won: true };
@@ -158,7 +167,7 @@ export class Game {
   }
 
   result() {
-    const playerMoves = this.acceptedGuesses;
+    const playerMoves = this.totalMoves;
     const timeMs = this.startedAt && this.finishedAt ? this.finishedAt - this.startedAt : null;
     if (this.status === "won") {
       return {

@@ -15,10 +15,13 @@ as valid as the reverse, since both genuinely sit on the shortest route.
 Each correct guess slots into its right position automatically, so the
 displayed route is always shown in order regardless of the order it was
 discovered in. Guessing something that *isn't* on any shortest route (e.g.
-`Brazil`) is simply rejected — there's no way to "detour" onto a longer
-valid path, since only path membership is checked, not adjacency to
-wherever the player currently is. Wrong guesses are tracked in a "ruled
-out" list so the player never has to remember what they already tried.
+`Brazil`) is rejected — there's no way to "detour" onto a longer valid
+path, since only path membership is checked, not adjacency to wherever
+the player currently is — but it isn't free: a wrong guess counts against
+the player's move total exactly like an old-style detour would, so
+carelessly guessing your way to the answer still costs efficiency. Wrong
+guesses are also tracked in a "ruled out" list so the player never has to
+remember what they already tried.
 
 The destination itself is never something you type — the moment every
 intermediate step is found (`United States` *and* `Mexico`, here), the
@@ -104,10 +107,11 @@ touching the graph or the data.
 
 ## Scoring
 
-Defined in `scoreFor()` in `js/game.js`. "Moves" here means total accepted
-guesses — every correct find, including a redundant one (see below) — plus
-one automatic move for the final, un-typed hop onto the destination, so a
-flawless run costs exactly the optimal move count:
+Defined in `scoreFor()` in `js/game.js`. "Moves" (`Game#totalMoves`) counts
+every guess that *costs* something — a correct new find, a wrong guess, or
+a redundant one (see below) — plus one automatic move for the final,
+un-typed hop onto the destination, so a flawless run with no wrong or
+redundant guesses costs exactly the optimal move count:
 
 - Perfect (optimal) route: **100 points**
 - Each extra move beyond optimal: **−10 points**
@@ -117,8 +121,13 @@ flawless run costs exactly the optimal move count:
 A "redundant" guess is a country that's genuinely on *some* shortest path
 but whose position in the route was already filled by a different valid
 country — this happens when more than one shortest path exists (a tie).
-It's accepted (it's not wrong), but it doesn't advance progress and counts
-against efficiency like an extra move would.
+It's accepted (it's not wrong), but it doesn't advance progress and still
+costs a move, exactly like a wrong guess does.
+
+What doesn't cost a move: re-typing the start, guessing the destination
+before every step is found, repeating a country already found, or a typo
+that doesn't resolve to any real country. Those aren't guesses *about the
+route* — they're just noise.
 
 Efficiency is reported as `optimal moves / player moves`, as a percentage.
 
@@ -130,9 +139,9 @@ this) of the earliest still-unfound step — concrete enough to actually
 narrow things down, without naming the country. Each use costs 15 points.
 
 Any guess that resolves to a real country but isn't on the shortest route
-is added to `Game#wrongGuesses` and shown in a persistent "Ruled out" list
-in the UI, so the player is never stuck re-guessing something they've
-already tried.
+is added to `Game#wrongGuesses`, shown in a persistent "Ruled out" list in
+the UI so the player is never stuck re-guessing something they've already
+tried, and — as above — counts against their move total.
 
 ## Difficulty
 

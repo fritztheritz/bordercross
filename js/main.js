@@ -176,7 +176,7 @@ function serializeGame(g) {
     slots: g.slots,
     guessedCodes: [...g.guessedCodes],
     wrongGuesses: [...g.wrongGuesses],
-    acceptedGuesses: g.acceptedGuesses,
+    totalMoves: g.totalMoves,
     hintsUsed: g.hintsUsed,
     status: g.status,
     startedAt: g.startedAt,
@@ -189,7 +189,7 @@ function restoreGame(g, saved) {
   g.slots = saved.slots.slice();
   g.guessedCodes = new Set(saved.guessedCodes);
   g.wrongGuesses = new Set(saved.wrongGuesses || []);
-  g.acceptedGuesses = saved.acceptedGuesses;
+  g.totalMoves = saved.totalMoves ?? saved.acceptedGuesses ?? 0;
   g.hintsUsed = saved.hintsUsed;
   g.status = saved.status;
   g.startedAt = saved.startedAt;
@@ -385,7 +385,8 @@ function submitMove(rawValue) {
       renderFeedback(
         els,
         `❌ ${activeGame.countryName(result.code)} isn't on the shortest route between ${activeGame.countryName(activeGame.startCode)} and ${activeGame.countryName(activeGame.destCode)}.`,
-        "err"
+        "err",
+        "counts as a move"
       );
       renderWrongGuesses(els, activeGame);
     }

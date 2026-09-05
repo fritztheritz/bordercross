@@ -235,7 +235,7 @@ number so people can compare the same day's puzzle:
 BorderCross #247 🇸🇬 → 🇧🇿
 7 moves (optimal: 4, 57% efficiency) · 1 hint
 🟨🟩🟩🟨🟩
-🚫 1 country off-limits
+🚫 Off-limits: 🇳🇬
 https://fritztheritz.github.io/bordercross/
 ```
 

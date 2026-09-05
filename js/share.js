@@ -43,7 +43,8 @@ export function buildShareText(game, result, opts = {}) {
 
   const lines = [`BorderCross${headerRest}`, statusLine, squares];
   if (game.restrictedCodes && game.restrictedCodes.size > 0) {
-    lines.push(`🚫 ${game.restrictedCodes.size} country${game.restrictedCodes.size === 1 ? "" : "ies"} off-limits`);
+    const restrictedFlags = [...game.restrictedCodes].map(flagEmoji).join(" ");
+    lines.push(`🚫 Off-limits: ${restrictedFlags}`);
   }
 
   const text = lines.join("\n");

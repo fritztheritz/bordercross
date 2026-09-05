@@ -54,10 +54,13 @@ export function buildShareText(game, result, opts = {}) {
       )
     : null;
   // A destination that only accepts plain text (iMessage, SMS, Notes) can't
-  // make one word of it a link — but a bare URL on its own is reliably
-  // auto-linkified. So instead of tacking the link on as an easy-to-miss
-  // final line, swap it in for the "BorderCross" header word itself.
-  const plainWithLink = opts.url ? [`${opts.url}${headerRest}`, ...lines.slice(1)].join("\n") : text;
+  // make one word of it a link. Putting the bare URL at the *front* of the
+  // message was tried and reverted — several apps' link auto-detection
+  // isn't line-scoped, so once it finds a URL it keeps linkifying
+  // everything after it, swallowing the score line and squares into the
+  // "link" too. A trailing line is the safe position: nothing follows it
+  // for an over-eager linkifier to sweep in.
+  const plainWithLink = opts.url ? `${text}\n${opts.url}` : text;
 
   return { text, html, plainWithLink, url: opts.url || null };
 }

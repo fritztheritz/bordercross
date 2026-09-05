@@ -13,8 +13,8 @@ import { pickRestrictions } from "./game.js";
 const STORAGE_PREFIX = "bordercross.daily.";
 const KEEP_DAYS = 30; // how much history to retain in localStorage
 
-// Day 1 of the daily challenge. Only used to number puzzles ("#1", "#2", ...).
-const EPOCH = "2026-01-01";
+// Day 0 of the daily challenge. Only used to number puzzles ("#0", "#1", ...).
+const EPOCH = "2026-09-05";
 
 // Weighted difficulty mix for the daily pick — skews toward Medium so most
 // days feel substantial without every day being a slog.
@@ -90,7 +90,7 @@ export function puzzleNumber(dateKey) {
   const [y, m, d] = dateKey.split("-").map(Number);
   const epoch = new Date(`${EPOCH}T00:00:00`);
   const day = new Date(y, m - 1, d);
-  return Math.round((day - epoch) / 86400000) + 1;
+  return Math.round((day - epoch) / 86400000);
 }
 
 export function msUntilNextMidnight(date = new Date()) {
@@ -125,7 +125,7 @@ export function dailyPair(graph, dateKey) {
 }
 
 function fillPairCache(graph, dateKey) {
-  const targetIndex = puzzleNumber(dateKey) - 1; // days since EPOCH, 0-based
+  const targetIndex = puzzleNumber(dateKey); // days since EPOCH, 0-based
   const windowStart = Math.max(0, targetIndex - REPEAT_AVOID_DAYS);
   for (let idx = windowStart; idx <= targetIndex; idx++) {
     const key = addDays(EPOCH, idx);

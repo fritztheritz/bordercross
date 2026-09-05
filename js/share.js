@@ -53,21 +53,27 @@ export function buildShareText(game, result, opts = {}) {
         "<br>"
       )
     : null;
+  // A destination that only accepts plain text (iMessage, SMS, Notes) can't
+  // make one word of it a link — but a bare URL on its own is reliably
+  // auto-linkified. So instead of tacking the link on as an easy-to-miss
+  // final line, swap it in for the "BorderCross" header word itself.
+  const plainWithLink = opts.url ? [`${opts.url}${headerRest}`, ...lines.slice(1)].join("\n") : text;
 
-  return { text, html, url: opts.url || null };
+  return { text, html, plainWithLink, url: opts.url || null };
 }
 
 /**
  * Shares via the native share sheet when available (mobile — lets the
  * player send straight to Messages, exactly like Wordle), falling back to
  * a clipboard copy on desktop. The clipboard copy writes both a plain-text
- * version (URL appended as a trailing line, since plain text can't carry a
- * real link) and a rich-text version (the "BorderCross" wordmark itself is
- * the hyperlink) — whichever the paste target supports wins.
- * @param {{ text: string, html: string|null, url: string|null }} share
+ * version (the link stands in for the "BorderCross" header word itself,
+ * since plain text can't carry a real hyperlink but a bare URL is reliably
+ * auto-linkified) and a rich-text version (the "BorderCross" wordmark itself
+ * is the hyperlink) — whichever the paste target supports wins.
+ * @param {{ text: string, html: string|null, plainWithLink: string, url: string|null }} share
  * @returns {Promise<"shared"|"copied"|"cancelled"|"failed">}
  */
-export async function shareResult({ text, html, url }) {
+export async function shareResult({ text, html, plainWithLink, url }) {
   if (navigator.share) {
     try {
       await navigator.share(url ? { text, url } : { text });
@@ -78,17 +84,16 @@ export async function shareResult({ text, html, url }) {
     }
   }
 
-  const plainWithUrl = url ? `${text}\n${url}` : text;
   try {
     if (html && window.ClipboardItem && navigator.clipboard.write) {
       const item = new ClipboardItem({
-        "text/plain": new Blob([plainWithUrl], { type: "text/plain" }),
+        "text/plain": new Blob([plainWithLink], { type: "text/plain" }),
         "text/html": new Blob([html], { type: "text/html" }),
       });
       await navigator.clipboard.write([item]);
       return "copied";
     }
-    await navigator.clipboard.writeText(plainWithUrl);
+    await navigator.clipboard.writeText(plainWithLink);
     return "copied";
   } catch {
     return "failed";

@@ -125,9 +125,14 @@ export function connectionType(graph, a, b) {
   return edges ? edges.get(b) ?? null : null;
 }
 
+// Shared Easy/Medium/Hard boundaries — used for the ticket's difficulty
+// badge (js/ui.js) and the "Hard" achievements (js/achievements.js), and
+// kept in step with the daily's own DIFFICULTY_TIERS (js/daily.js) and
+// Unlimited's difficulty dropdown (js/main.js) so the same move count
+// always reads the same difficulty everywhere in the app.
 export function difficultyFor(optimalMoves) {
-  if (optimalMoves <= 4) return "Easy";
-  if (optimalMoves <= 9) return "Medium";
+  if (optimalMoves <= 6) return "Easy";
+  if (optimalMoves <= 11) return "Medium";
   return "Hard";
 }
 

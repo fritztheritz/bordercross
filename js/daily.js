@@ -18,11 +18,32 @@ const EPOCH = "2026-09-05";
 
 // Weighted difficulty mix for the daily pick — skews toward Medium so most
 // days feel substantial without every day being a slog.
-const DIFFICULTY_TIERS = [
+//
+// Raised on 2026-09-06: a 1- or 2-country puzzle was judged too trivial
+// for the daily specifically, so Easy's floor became 4 moves (3 countries
+// in between) — and Medium/Hard moved up by the same +2 so the three
+// tiers stay proportionally spaced. Every already-published day (anything
+// before DIFFICULTY_TIERS_CUTOVER) keeps generating from the *original*
+// 2-4/5-9/10-20 curve — a daily puzzle is a published fact once it's
+// live, exactly like EPOCH itself never moves once puzzles are numbered
+// against it, so changing the generator can never retroactively change a
+// day players have already seen (or shared). Only CUTOVER and later use
+// the new curve. Unlimited's own difficulty dropdown is untouched and
+// still goes down to 2 — this reshuffle is specific to the daily.
+const DIFFICULTY_TIERS_CUTOVER = "2026-09-07";
+const ORIGINAL_DIFFICULTY_TIERS = [
   { minMoves: 2, maxMoves: 4, weight: 0.25 }, // Easy
   { minMoves: 5, maxMoves: 9, weight: 0.5 }, // Medium
   { minMoves: 10, maxMoves: 20, weight: 0.25 }, // Hard
 ];
+const RAISED_DIFFICULTY_TIERS = [
+  { minMoves: 4, maxMoves: 6, weight: 0.25 }, // Easy
+  { minMoves: 7, maxMoves: 11, weight: 0.5 }, // Medium
+  { minMoves: 12, maxMoves: 22, weight: 0.25 }, // Hard
+];
+function difficultyTiersFor(dateKey) {
+  return dateKey < DIFFICULTY_TIERS_CUTOVER ? ORIGINAL_DIFFICULTY_TIERS : RAISED_DIFFICULTY_TIERS;
+}
 
 // How many previous days' pairs a new day's pick tries to avoid repeating.
 // Order doesn't count as different — Russia→USA "reuses" USA↔Russia just as
@@ -70,14 +91,14 @@ function mulberry32(seed) {
   };
 }
 
-function pickTier(rng) {
+function pickTier(rng, tiers) {
   const r = rng();
   let cumulative = 0;
-  for (const tier of DIFFICULTY_TIERS) {
+  for (const tier of tiers) {
     cumulative += tier.weight;
     if (r < cumulative) return tier;
   }
-  return DIFFICULTY_TIERS[DIFFICULTY_TIERS.length - 1];
+  return tiers[tiers.length - 1];
 }
 
 /** Today's date key in the player's local timezone, e.g. "2026-09-05". */
@@ -149,7 +170,7 @@ function computeDayPair(graph, dateKey, idx) {
   }
 
   const rng = mulberry32(hashString(dateKey));
-  const tier = pickTier(rng);
+  const tier = pickTier(rng, difficultyTiersFor(dateKey));
   const codes = [...graph.keys()].sort();
 
   let fallback = null;

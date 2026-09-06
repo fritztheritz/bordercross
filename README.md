@@ -203,9 +203,16 @@ never loses progress in the other two.
   derived deterministically from the date string via a seeded PRNG
   (`dailyPair()`) — no server or fetch involved, so anyone opening the app
   on the same day computes the same puzzle independently. The day's
-  difficulty is drawn from a weighted mix — 25% Easy, 50% Medium, 25% Hard
-  — rather than a single fixed range, so most days feel substantial
-  without every day being a slog. `dailyPair()` also retries its seeded
+  difficulty is drawn from a weighted mix — 25% Easy (4–6 moves), 50%
+  Medium (7–11), 25% Hard (12+) — rather than a single fixed range, so
+  most days feel substantial without every day being a slog. Those
+  numbers only apply from `DIFFICULTY_TIERS_CUTOVER` (2026-09-07) onward:
+  raised from an original 2-4/5-9/10-20 after a 1-country puzzle was
+  judged too trivial for the daily, every day *before* the cutover keeps
+  generating from the original curve, so a change like this can never
+  retroactively alter a puzzle that's already been published (and
+  possibly shared) — see `ORIGINAL_DIFFICULTY_TIERS` in `js/daily.js`.
+  `dailyPair()` also retries its seeded
   draw against the previous 30 days' pairs (treating `A→B` and `B→A` as
   the same pair) so a puzzle can't repeat within about a month — that
   history is never stored, it's recomputed from the same seeded sequence
@@ -228,8 +235,11 @@ never loses progress in the other two.
   press New Game, guaranteed solvable since the graph is fully connected.
   This is what Classic mode did before the daily challenge existed. A
   difficulty dropdown next to the mode switcher narrows the range
-  `randomPair()` draws from — Any (2–14 moves), Easy (2–4), Medium (5–9),
-  or Hard (10–20) — and the choice is remembered in `localStorage`. A
+  `randomPair()` draws from — Any (2–14 moves, deliberately untouched by
+  the daily's difficulty reshuffle above), Easy (4–6), Medium (7–11), or
+  Hard (12–22), matching `difficultyFor()`'s boundaries (`js/graph.js`) so
+  the badge you see always matches the difficulty you picked — and the
+  choice is remembered in `localStorage`. A
   second dropdown next to it (Restrictions: Random / Off / On) overrides
   the usual chance-based roll described below — "Off" always plays
   unrestricted, "On" retries fresh pairs (up to 20 attempts) until one

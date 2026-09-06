@@ -1,6 +1,6 @@
 import { test, describe, beforeEach } from "node:test";
 import assert from "node:assert/strict";
-import { buildGraph } from "../js/graph.js";
+import { buildGraph, bfsPath } from "../js/graph.js";
 import { todayKey, puzzleNumber, addDays, dailyPair } from "../js/daily.js";
 import { installLocalStorageStub } from "./helpers/localStorageStub.js";
 
@@ -45,6 +45,23 @@ describe("dailyPair", () => {
       const [start, dest] = dailyPair(graph, key);
       assert.notEqual(start, dest);
       assert.ok(graph.has(start) && graph.has(dest));
+    }
+  });
+
+  test("already-published days (before the difficulty-tier cutover) are frozen exactly as they shipped", () => {
+    // These are the actual live values as of the 2026-09-06 tier change —
+    // pinned here specifically so a future edit can't accidentally
+    // change a day that already went out to players.
+    assert.deepEqual(dailyPair(graph, "2026-09-05"), ["UA", "HT"]);
+    assert.deepEqual(dailyPair(graph, "2026-09-06"), ["LK", "PK"]);
+  });
+
+  test("every day from the cutover onward is at least 4 moves (3 countries in between)", () => {
+    for (let i = 0; i < 120; i++) {
+      const key = addDays("2026-09-07", i);
+      const [start, dest] = dailyPair(graph, key);
+      const moves = bfsPath(graph, start, dest).length - 1;
+      assert.ok(moves >= 4, `${key} (${start}->${dest}) was only ${moves} moves`);
     }
   });
 

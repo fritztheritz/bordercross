@@ -271,11 +271,16 @@ els.colorblindToggle.addEventListener("change", () => {
 // ---------- Unlimited mode difficulty ----------
 
 const DIFFICULTY_PICKER_KEY = "bordercross.unlimitedDifficulty";
+// Easy/Medium/Hard match difficultyFor() (js/graph.js) and the daily's own
+// DIFFICULTY_TIERS (js/daily.js), so the badge you see always matches the
+// difficulty you picked. "Any" is deliberately untouched — a wide-open,
+// no-promises range, not tied to the Easy/Medium/Hard vocabulary at all —
+// so a quick 2-move puzzle is still just a New Game press away.
 const DIFFICULTY_RANGES = {
   any: { minMoves: 2, maxMoves: 14 },
-  easy: { minMoves: 2, maxMoves: 4 },
-  medium: { minMoves: 5, maxMoves: 9 },
-  hard: { minMoves: 10, maxMoves: 20 },
+  easy: { minMoves: 4, maxMoves: 6 },
+  medium: { minMoves: 7, maxMoves: 11 },
+  hard: { minMoves: 12, maxMoves: 22 },
 };
 
 (function initDifficultyPicker() {

@@ -71,10 +71,10 @@ describe("graphExcluding", () => {
 describe("difficultyFor", () => {
   test("buckets at the documented boundaries", () => {
     assert.equal(difficultyFor(2), "Easy");
-    assert.equal(difficultyFor(4), "Easy");
-    assert.equal(difficultyFor(5), "Medium");
-    assert.equal(difficultyFor(9), "Medium");
-    assert.equal(difficultyFor(10), "Hard");
+    assert.equal(difficultyFor(6), "Easy");
+    assert.equal(difficultyFor(7), "Medium");
+    assert.equal(difficultyFor(11), "Medium");
+    assert.equal(difficultyFor(12), "Hard");
   });
 });
 

@@ -629,9 +629,13 @@ function showResultModal(result, newlyUnlocked = []) {
 }
 
 /** The base app URL for most shares, but a Custom-mode challenge link
- * (?start=XX&dest=YY) for Custom — see tryStartChallengeFromUrl(). */
+ * (?start=XX&dest=YY) for Custom — see tryStartChallengeFromUrl(). Always
+ * the site root rather than `location.pathname` verbatim — however this
+ * particular visitor arrived (a bookmark to /index.html, a trailing
+ * slash-less link, whatever), the shared link should be the one clean
+ * canonical URL, not a mirror of however they got here. */
 function shareUrlFor() {
-  const base = location.origin + location.pathname;
+  const base = `${location.origin}/`;
   if (mode !== "custom") return base;
   return `${base}?start=${activeGame.startCode}&dest=${activeGame.destCode}`;
 }
@@ -878,7 +882,7 @@ function tryStartChallengeFromUrl() {
   if (!start || !dest || start === dest || !graph.has(start) || !graph.has(dest)) return false;
 
   activateCustomGame(start, dest);
-  history.replaceState(null, "", location.pathname);
+  history.replaceState(null, "", "/");
   return true;
 }
 

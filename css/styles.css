@@ -362,8 +362,14 @@ button:focus-visible, input:focus-visible, .suggestion-item:focus-visible {
   .topbar { gap: 14px; padding-bottom: 14px; }
   .topbar-controls { flex-direction: column; align-items: stretch; width: 100%; gap: 10px; }
   .mode-toggle button { flex: 1; }
-  .primary-actions #newGameBtn { flex: 1; }
-  .difficulty-picker { flex: 1; min-width: 0; }
+  /* Unlimited can show up to three dropdowns (difficulty/restrictions/
+     region) plus New Game at once — on a narrow screen that's too much
+     for one unbroken row, so it wraps: dropdowns flow two-ish per line,
+     and New Game always gets its own full-width row as a clear, large
+     tap target rather than fighting them for space. */
+  .primary-actions { flex-wrap: wrap; width: 100%; }
+  .primary-actions #newGameBtn { flex: 1 1 100%; }
+  .difficulty-picker { flex: 1 1 130px; min-width: 0; }
   .icon-buttons { justify-content: space-between; }
   .icon-btn { width: 42px; height: 42px; }
 }

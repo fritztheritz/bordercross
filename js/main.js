@@ -28,6 +28,7 @@ import { buildShareText, shareResult } from "./share.js";
 import { soundEnabled, setSoundEnabled, playFound, playWrong, playWin } from "./sound.js";
 import { burstConfetti } from "./confetti.js";
 import { loadUnlocked, checkAchievements, resetAchievements } from "./achievements.js";
+import { exportProgress, importProgress } from "./backup.js";
 import {
   renderTicket,
   renderRouteChain,
@@ -82,6 +83,9 @@ const els = {
   moveDistribution: document.getElementById("moveDistribution"),
   trendChart: document.getElementById("trendChart"),
   resetStatsBtn: document.getElementById("resetStatsBtn"),
+  exportProgressBtn: document.getElementById("exportProgressBtn"),
+  importProgressBtn: document.getElementById("importProgressBtn"),
+  importProgressInput: document.getElementById("importProgressInput"),
   achievementsGrid: document.getElementById("achievementsGrid"),
   achievementsProgress: document.getElementById("achievementsProgress"),
   resultHeadline: document.getElementById("resultHeadline"),
@@ -90,6 +94,9 @@ const els = {
   confettiLayer: document.getElementById("confettiLayer"),
   shareBtn: document.getElementById("shareBtn"),
   colorblindToggle: document.getElementById("colorblindToggle"),
+  installBanner: document.getElementById("installBanner"),
+  installBtn: document.getElementById("installBtn"),
+  installDismissBtn: document.getElementById("installDismissBtn"),
   playAgainBtn: document.getElementById("playAgainBtn"),
   customStartInput: document.getElementById("customStartInput"),
   customDestInput: document.getElementById("customDestInput"),
@@ -190,6 +197,56 @@ els.soundBtn.addEventListener("click", () => {
   setSoundEnabled(!soundEnabled());
   syncSoundButton();
 });
+
+// ---------- Install prompt ----------
+//
+// Chromium browsers fire `beforeinstallprompt` once, early, and expect the
+// page to hang onto the event and trigger it later on the page's own
+// terms — Chrome deliberately doesn't show its own UI unless asked, so
+// this is the *only* way to offer an install action at all. Safari/
+// Firefox never fire this event; on those, the banner below just never
+// appears, which is the correct (if quieter) outcome — there's no
+// equivalent programmatic prompt to fall back to there.
+
+const INSTALL_DISMISSED_KEY = "bordercross.installPromptDismissed";
+let deferredInstallPrompt = null;
+
+window.addEventListener("beforeinstallprompt", (e) => {
+  e.preventDefault();
+  deferredInstallPrompt = e;
+});
+
+window.addEventListener("appinstalled", () => {
+  deferredInstallPrompt = null;
+  try {
+    localStorage.setItem(INSTALL_DISMISSED_KEY, "1");
+  } catch {}
+});
+
+function installPromptAvailable() {
+  if (!deferredInstallPrompt) return false;
+  try {
+    return !localStorage.getItem(INSTALL_DISMISSED_KEY);
+  } catch {
+    return true;
+  }
+}
+
+function dismissInstallBanner() {
+  els.installBanner.hidden = true;
+  try {
+    localStorage.setItem(INSTALL_DISMISSED_KEY, "1");
+  } catch {}
+}
+
+els.installBtn.addEventListener("click", async () => {
+  if (!deferredInstallPrompt) return;
+  deferredInstallPrompt.prompt();
+  await deferredInstallPrompt.userChoice;
+  deferredInstallPrompt = null;
+  dismissInstallBanner();
+});
+els.installDismissBtn.addEventListener("click", dismissInstallBanner);
 
 // ---------- Colorblind-friendly share squares ----------
 //
@@ -567,6 +624,7 @@ function showResultModal(result, newlyUnlocked = []) {
   }
 
   els.shareBtn.textContent = "Share Result";
+  els.installBanner.hidden = !(result.status === "won" && installPromptAvailable());
   openModal("resultModal");
 }
 
@@ -652,7 +710,7 @@ function submitMove(rawValue) {
   if (result.won) {
     renderFeedback(els, `✅ ${activeGame.countryName(result.code)} — route complete!`, "ok");
     renderRouteChain(els, activeGame);
-    map.render(activeGame);
+    map.renderCompletion(activeGame);
     finishGame(activeGame.result());
     return;
   }
@@ -691,20 +749,56 @@ els.giveUpBtn.addEventListener("click", () => {
 
 // ---------- Stats ----------
 
-els.statsBtn.addEventListener("click", () => {
+function refreshStatsView() {
   const stats = loadStats();
   renderStats(els.statsGrid, stats, loadStreakStats());
   renderMoveDistribution(els.moveDistribution, stats);
   renderTrendChart(els.trendChart, stats);
+}
+
+els.statsBtn.addEventListener("click", () => {
+  refreshStatsView();
   openModal("statsModal");
 });
 els.resetStatsBtn.addEventListener("click", () => {
   if (!confirm("Reset all statistics? This can't be undone.")) return;
-  const stats = resetStats();
+  resetStats();
   resetAchievements();
-  renderStats(els.statsGrid, stats, loadStreakStats());
-  renderMoveDistribution(els.moveDistribution, stats);
-  renderTrendChart(els.trendChart, stats);
+  refreshStatsView();
+});
+
+els.exportProgressBtn.addEventListener("click", () => {
+  const blob = new Blob([JSON.stringify(exportProgress(), null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `bordercross-progress-${todayKey()}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+});
+
+els.importProgressBtn.addEventListener("click", () => els.importProgressInput.click());
+
+els.importProgressInput.addEventListener("change", async () => {
+  const file = els.importProgressInput.files[0];
+  els.importProgressInput.value = ""; // let the same file be re-picked later if needed
+  if (!file) return;
+  if (!confirm("Import progress from this file? This replaces your current stats, streak, and achievements.")) return;
+
+  let parsed;
+  try {
+    parsed = JSON.parse(await file.text());
+  } catch {
+    alert("Couldn't read that file — make sure it's a BorderCross progress export.");
+    return;
+  }
+  const result = importProgress(parsed);
+  if (!result.ok) {
+    alert(result.error);
+    return;
+  }
+  refreshStatsView();
+  alert("Progress imported.");
 });
 els.howToBtn.addEventListener("click", () => openModal("howToModal"));
 els.achievementsBtn.addEventListener("click", () => {

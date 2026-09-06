@@ -100,4 +100,37 @@ export class RouteMap {
       }).addTo(this.lineLayer);
     }
   }
+
+  /** Same picture as render() for a just-won game, but reveals each
+   * confirmed segment one at a time with a short stagger instead of the
+   * whole route appearing at once — every segment already exists at this
+   * point (the win condition is every slot being filled), so without this
+   * the "you did it" moment would just be an instant flash rather than a
+   * beat you can actually watch land. Only meant for the render that
+   * completes a route — revisiting an already-won puzzle uses render(). */
+  renderCompletion(game) {
+    const L = window.L;
+    this.lineLayer.clearLayers();
+    this.markerLayer.clearLayers();
+
+    const sequence = game.displaySequence();
+    sequence.forEach((code, i) => {
+      const icon = i === 0 ? ICONS.start : i === sequence.length - 1 ? ICONS.destReached : ICONS.visited;
+      L.marker(this._latLng(code), { icon, keyboard: false })
+        .bindTooltip(game.countryName(code), { direction: "top", offset: [0, -6] })
+        .addTo(this.markerLayer);
+    });
+
+    for (let i = 0; i < sequence.length - 1; i++) {
+      const a = sequence[i];
+      const b = sequence[i + 1];
+      setTimeout(() => {
+        L.polyline([this._latLng(a), this._latLng(b)], {
+          color: "#d9a441",
+          weight: 3,
+          opacity: 0.9,
+        }).addTo(this.lineLayer);
+      }, i * 160);
+    }
+  }
 }

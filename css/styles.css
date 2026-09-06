@@ -405,6 +405,27 @@ button:focus-visible, input:focus-visible, .suggestion-item:focus-visible {
 
 .catch-up-banner[hidden] { display: none; }
 
+/* ---------- Install prompt banner (result modal) ---------- */
+
+.install-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  background: color-mix(in srgb, var(--gold) 12%, var(--surface-raised));
+  border: 1px solid color-mix(in srgb, var(--gold) 36%, var(--hairline-strong));
+  border-radius: 12px;
+  padding: 10px 16px;
+  margin-top: 14px;
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.install-banner[hidden] { display: none; }
+
+.install-banner-actions { display: flex; gap: 8px; flex-shrink: 0; }
+
 .restrictions-label {
   font-size: 12px;
   font-weight: 800;

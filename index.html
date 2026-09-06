@@ -196,7 +196,11 @@
         <div class="dist-title">Efficiency Trend</div>
         <div id="trendChart"></div>
       </div>
+      <p class="muted">Everything above lives only in this browser — clearing site data or switching devices loses it for good unless you back it up first.</p>
       <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" id="exportProgressBtn">Export progress</button>
+        <button type="button" class="btn btn-ghost" id="importProgressBtn">Import progress</button>
+        <input type="file" id="importProgressInput" accept="application/json" hidden />
         <button type="button" class="btn btn-ghost" id="resetStatsBtn">Reset statistics</button>
       </div>
     </div>
@@ -249,6 +253,13 @@
         <input type="checkbox" id="colorblindToggle" />
         <span>Colorblind-friendly share squares (🟦/🟧 instead of 🟩/🟨)</span>
       </label>
+      <div class="install-banner" id="installBanner" hidden>
+        <span>📲 Install BorderCross for one-tap access next time.</span>
+        <div class="install-banner-actions">
+          <button type="button" class="btn btn-ghost" id="installDismissBtn">Not now</button>
+          <button type="button" class="btn btn-primary" id="installBtn">Install</button>
+        </div>
+      </div>
       <div class="modal-actions">
         <button type="button" class="btn btn-primary" id="shareBtn">Share Result</button>
         <button type="button" class="btn" id="playAgainBtn">New Game</button>

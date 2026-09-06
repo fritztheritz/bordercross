@@ -44,6 +44,22 @@ python3 -m http.server 8000
 
 Then open the printed local URL in a browser.
 
+### Tests
+
+The core game logic (graph, scoring, daily-puzzle generation, stats,
+achievements, share text, backup) has no DOM dependency, so it's covered
+by a plain [`node --test`](https://nodejs.org/api/test.html) suite — zero
+dependencies, nothing to install:
+
+```bash
+npm test
+```
+
+`js/main.js`, `js/ui.js`, `js/map.js`, `js/sound.js`, and `js/confetti.js`
+are deliberately untested here — they're the DOM/rendering layer, and
+this suite exists to catch regressions in the rules and data underneath
+it, not to be a full end-to-end harness.
+
 ## How a guess is validated
 
 A guessed country is accepted if it lies on *at least one* shortest path
@@ -102,6 +118,7 @@ js/achievements.js   Achievement definitions + unlock tracking (localStorage)
 js/map.js            Leaflet route-map rendering (pan/zoom, no political borders)
 js/daily.js          Deterministic daily puzzle (seeded PRNG) + its localStorage persistence
 js/share.js          Wordle-style spoiler-free share text + native share/clipboard
+js/backup.js         Export/import of local progress (stats, streak, achievements)
 js/sound.js          Synthesized sound effects (Web Audio API, no assets)
 js/confetti.js       CSS-only confetti burst for winning
 js/ui.js             DOM rendering helpers
@@ -109,6 +126,8 @@ js/main.js           Event wiring / bootstrapping (three Game instances, one per
 assets/              Logo, favicon, PWA/social-preview images, and flag icons (see "Brand assets" and "Flags" below)
 manifest.json        Web app manifest (installable/PWA)
 sw.js                Service worker — offline app-shell caching
+test/                node --test suite over the DOM-free modules (see "Tests" above)
+package.json         Just the `npm test` script — the site itself has no dependencies
 ```
 
 Each layer only talks to the ones below it, so e.g. the scoring formula in
@@ -351,6 +370,15 @@ line is only drawn between two markers that are both confirmed *and*
 adjacent positions in the route, so the map never implies a connection
 between two finds that don't actually sit next to each other.
 
+The render that actually completes a route (`RouteMap#renderCompletion()`)
+is a special case: every segment technically already exists the instant
+the win condition is met (all slots filled), so drawing them all at once
+would just be an instant flash. Instead each segment is revealed with a
+short stagger, so the "you did it" moment reads as watching the route
+connect rather than a picture just appearing. Every other render (an
+in-progress guess, revisiting an already-won puzzle) uses the plain,
+instant `render()`.
+
 ## Data notes / known simplifications
 
 - Western Sahara is treated as part of Morocco for the purposes of a
@@ -478,3 +506,24 @@ same-origin requests), so they simply fail to load without a connection
 rather than serving something stale. Verified by loading the app once
 online, then reloading fully offline (Chrome DevTools network throttling)
 and confirming a full guess-and-score round trip still works.
+
+Chromium browsers also let a site offer its own install action instead of
+relying on the player finding the browser's own UI: `js/main.js` captures
+the `beforeinstallprompt` event once (Chrome intentionally suppresses its
+own prompt so a page can choose when to ask) and shows a small "Install
+BorderCross" banner on the result modal after a win. Dismissing it (or
+installing) is remembered in `localStorage`, so it only ever asks once.
+Safari and Firefox never fire this event at all — there's no equivalent
+programmatic prompt on those browsers, so the banner just never appears
+there, which is the correct outcome rather than a gap to fill.
+
+## Backing up your progress
+
+Stats, streak, and achievements (see above) live only in this browser's
+`localStorage` — clearing site data, switching browsers, or losing the
+profile wipes them silently, with no account to fall back on. **Export
+progress** (in the Statistics modal, `js/backup.js`) downloads all three
+as a small JSON file; **Import progress** restores from one, on this
+device or a different one. Import validates every field is well-formed
+JSON *before* writing anything, so a corrupted or unrelated file can't
+leave localStorage half-updated — it's rejected outright instead.

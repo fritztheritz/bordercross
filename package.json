@@ -1,0 +1,9 @@
+{
+  "name": "bordercross",
+  "private": true,
+  "type": "module",
+  "description": "Test-only tooling for the pure game logic — the site itself ships with no build step and no dependencies.",
+  "scripts": {
+    "test": "node --test"
+  }
+}

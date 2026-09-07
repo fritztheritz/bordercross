@@ -45,6 +45,18 @@ export class RouteMap {
 
     this.lineLayer = L.layerGroup().addTo(this.map);
     this.markerLayer = L.layerGroup().addTo(this.map);
+    this._pendingTimeouts = []; // staggered draws scheduled by renderCompletion(), not yet fired
+  }
+
+  /** Cancels any staggered segment draws still pending from a previous
+   * renderCompletion() — without this, switching modes or starting a new
+   * game mid-animation left old timeouts free to fire later and draw a
+   * stale gold line from the *previous* game onto whatever's on the map
+   * by then. Called at the top of both render() and renderCompletion() so
+   * neither one can be interrupted by the other's leftovers. */
+  _clearPendingTimeouts() {
+    this._pendingTimeouts.forEach(clearTimeout);
+    this._pendingTimeouts = [];
   }
 
   _latLng(code) {
@@ -63,6 +75,7 @@ export class RouteMap {
   /** Redraws markers + confirmed route segments from the current game state. */
   render(game) {
     const L = window.L;
+    this._clearPendingTimeouts();
     this.lineLayer.clearLayers();
     this.markerLayer.clearLayers();
 
@@ -110,6 +123,7 @@ export class RouteMap {
    * completes a route — revisiting an already-won puzzle uses render(). */
   renderCompletion(game) {
     const L = window.L;
+    this._clearPendingTimeouts();
     this.lineLayer.clearLayers();
     this.markerLayer.clearLayers();
 
@@ -124,13 +138,14 @@ export class RouteMap {
     for (let i = 0; i < sequence.length - 1; i++) {
       const a = sequence[i];
       const b = sequence[i + 1];
-      setTimeout(() => {
+      const id = setTimeout(() => {
         L.polyline([this._latLng(a), this._latLng(b)], {
           color: "#d9a441",
           weight: 3,
           opacity: 0.9,
         }).addTo(this.lineLayer);
       }, i * 160);
+      this._pendingTimeouts.push(id);
     }
   }
 }

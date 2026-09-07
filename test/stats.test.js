@@ -102,6 +102,55 @@ describe("recordDailyOutcome", () => {
     recordDailyOutcome("2026-09-05", false); // should be ignored
     assert.deepEqual(loadStreakStats(), before);
   });
+
+  test("catching up on an earlier missed day, played *after* a later day, still bridges the streak", () => {
+    // Day 0 won, day 1 skipped, day 2 ("today") played and won first —
+    // only afterward does the player use catch-up to go back and win the
+    // missed day 1. The streak should end up recognizing four unbroken
+    // days (0-3), not get stuck at 1 forever because day 1 was recorded
+    // out of calendar order.
+    recordDailyOutcome("2026-09-05", true); // day 0
+    let streak = recordDailyOutcome("2026-09-07", true); // day 2, "today" — day 1 still missing
+    assert.equal(streak.current, 1);
+
+    streak = recordDailyOutcome("2026-09-06", true); // catch-up on day 1, played last
+    assert.equal(streak.current, 3); // day 0, 1, 2 are now a contiguous win streak
+    assert.equal(streak.max, 3);
+
+    streak = recordDailyOutcome("2026-09-08", true); // day 3, played normally
+    assert.equal(streak.current, 4);
+    assert.equal(streak.max, 4);
+  });
+
+  test("a catch-up win can't bridge across a day that was actually lost", () => {
+    recordDailyOutcome("2026-09-05", true); // day 0: won
+    recordDailyOutcome("2026-09-06", false); // day 1: lost (e.g. gave up)
+    let streak = recordDailyOutcome("2026-09-07", true); // day 2 ("today"): won
+    assert.equal(streak.current, 1); // day 1's loss already breaks the chain
+
+    // Catching up on day 1 isn't offered once it's already finished (see
+    // canReplayYesterday in main.js), but recordDailyOutcome itself must
+    // still treat an already-recorded date as a no-op rather than let a
+    // second call flip day 1 from lost to won.
+    streak = recordDailyOutcome("2026-09-06", true);
+    assert.equal(streak.current, 1);
+  });
+
+  test("pre-existing saves without a `completed` record migrate cleanly", () => {
+    // Simulates a save written by the old streak logic, before the
+    // out-of-order fix — no per-day record, just the running counters.
+    localStorage.setItem(
+      "bordercross.streak.v1",
+      JSON.stringify({ current: 3, max: 5, lastCompletedDate: "2026-09-07" })
+    );
+    const streak = loadStreakStats();
+    assert.equal(streak.current, 3);
+    assert.equal(streak.max, 5);
+    // The next real day should extend the migrated streak, not reset it.
+    const next = recordDailyOutcome("2026-09-08", true);
+    assert.equal(next.current, 4);
+    assert.equal(next.max, 5);
+  });
 });
 
 describe("averageMoves", () => {

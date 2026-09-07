@@ -1,7 +1,7 @@
 import { test, describe, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { buildGraph, bfsPath } from "../js/graph.js";
-import { todayKey, puzzleNumber, addDays, dailyPair } from "../js/daily.js";
+import { todayKey, puzzleNumber, addDays, dailyPair, dailyRestrictions } from "../js/daily.js";
 import { installLocalStorageStub } from "./helpers/localStorageStub.js";
 
 const graph = buildGraph();
@@ -83,5 +83,40 @@ describe("dailyPair", () => {
         );
       }
     }
+  });
+});
+
+describe("dailyRestrictions", () => {
+  test("already-published days keep the exact restriction (or lack of one) they shipped with", () => {
+    // Pinned the same way as dailyPair's own frozen-days test above — these
+    // are the actual live values as of the 2026-09-07 restrictions-window
+    // fix, from before pickRestrictions' own eligible window moved off
+    // [3,6]. A future change to the window must not reach back and change
+    // whether an already-published day got the restrictions twist.
+    for (const [key, start, dest] of [
+      ["2026-09-05", "UA", "HT"],
+      ["2026-09-06", "LK", "PK"],
+      ["2026-09-07", "FI", "ES"],
+    ]) {
+      assert.deepEqual(dailyPair(graph, key), [start, dest]);
+      assert.deepEqual(dailyRestrictions(graph, key, start, dest), []);
+    }
+  });
+
+  test("from the restrictions-window cutover onward, some Medium/Hard-tier days do get restricted", () => {
+    // Regression test for the window having once been stuck at [3,6],
+    // which made this impossible for any day past Easy's own move range.
+    let sawOne = false;
+    for (let i = 0; i < 120; i++) {
+      const key = addDays("2026-09-08", i);
+      const [start, dest] = dailyPair(graph, key);
+      const moves = bfsPath(graph, start, dest).length - 1;
+      if (moves < 7) continue; // Easy-tier day — not what this test is checking
+      if (dailyRestrictions(graph, key, start, dest).length > 0) {
+        sawOne = true;
+        break;
+      }
+    }
+    assert.ok(sawOne, "expected at least one Medium/Hard-tier day in the next 120 to get restricted");
   });
 });

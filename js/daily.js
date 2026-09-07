@@ -45,6 +45,21 @@ function difficultyTiersFor(dateKey) {
   return dateKey < DIFFICULTY_TIERS_CUTOVER ? ORIGINAL_DIFFICULTY_TIERS : RAISED_DIFFICULTY_TIERS;
 }
 
+// pickRestrictions()'s own eligible-base-move window (js/game.js) moved
+// from [3,6] to [5,8] on 2026-09-07, the day after the tier raise above,
+// once it turned out the old window no longer overlapped the new Medium/
+// Hard tiers at all — see that function's doc comment. Same rule as
+// DIFFICULTY_TIERS_CUTOVER: a day's restriction (or lack of one) is a
+// published fact once dailyRestrictions() has been computed for it, so
+// only RESTRICTIONS_CUTOVER and later use the new window; everything
+// before it keeps rolling against the original [3,6].
+const RESTRICTIONS_CUTOVER = "2026-09-08";
+const ORIGINAL_RESTRICTIONS_OPTS = { minBaseMoves: 3, maxBaseMoves: 6 };
+function restrictionsOptsFor(dateKey) {
+  // undefined lets pickRestrictions fall back to its own (now-current) defaults.
+  return dateKey < RESTRICTIONS_CUTOVER ? ORIGINAL_RESTRICTIONS_OPTS : undefined;
+}
+
 // How many previous days' pairs a new day's pick tries to avoid repeating.
 // Order doesn't count as different — Russia→USA "reuses" USA↔Russia just as
 // much as USA→Russia would, from a player's perspective.
@@ -207,7 +222,7 @@ function computeDayPair(graph, dateKey, idx) {
  * other mode; see pickRestrictions() in game.js for the actual rule. */
 export function dailyRestrictions(graph, dateKey, startCode, destCode) {
   const rng = mulberry32(hashString(dateKey + ":restrictions"));
-  return pickRestrictions(graph, startCode, destCode, rng);
+  return pickRestrictions(graph, startCode, destCode, rng, restrictionsOptsFor(dateKey));
 }
 
 export function loadDailyState(dateKey) {

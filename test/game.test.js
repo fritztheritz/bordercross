@@ -132,22 +132,39 @@ describe("randomPair", () => {
 });
 
 describe("pickRestrictions", () => {
+  // CA -> GT is only 3 moves, below the default eligible window (5-8) on
+  // its own — these two tests care about the chance-roll and
+  // intermediates-only behavior specifically, not the window's exact
+  // bounds, so they widen it explicitly rather than depend on the current
+  // default numbers.
+  const wideWindow = { minBaseMoves: 0, maxBaseMoves: 20 };
+
   test("never restricts when the roll misses (rng >= chance)", () => {
     const rng = makeRng([0.99]);
-    assert.deepEqual(pickRestrictions(graph, "CA", "GT", rng), []);
+    assert.deepEqual(pickRestrictions(graph, "CA", "GT", rng, wideWindow), []);
   });
 
   test("only ever picks from the base path's own intermediates, and never blows the route up too far", () => {
     const rng = makeRng([0, 0.1, 0.1, 0.1, 0.1, 0.1]); // pass the chance roll, then low picks
     const basePath = bfsPath(graph, "CA", "GT");
     const intermediates = new Set(basePath.slice(1, -1));
-    const picked = pickRestrictions(graph, "CA", "GT", rng);
+    const picked = pickRestrictions(graph, "CA", "GT", rng, wideWindow);
     for (const code of picked) assert.ok(intermediates.has(code));
   });
 
   test("returns [] when the base route is outside the eligible move range", () => {
     const rng = makeRng([0]); // would always take the restriction if eligible
-    // CA -> US is 1 move, below minBaseMoves (3) — nothing to restrict.
+    // CA -> US is 1 move, below minBaseMoves (5 by default) — nothing to restrict.
     assert.deepEqual(pickRestrictions(graph, "CA", "US", rng), []);
+  });
+
+  test("the default window (5-8) covers Medium-tier pairs, not just Easy ones", () => {
+    // AD -> PS is a real 7-move pair (Medium under the daily's own tiers) —
+    // regression test for the window having once been stuck at [3,6], which
+    // made restrictions impossible for any Medium/Hard-tier pair at all.
+    const rng = makeRng([0, 0.1, 0.1, 0.1, 0.1, 0.1]);
+    assert.equal(bfsPath(graph, "AD", "PS").length - 1, 7);
+    const picked = pickRestrictions(graph, "AD", "PS", rng);
+    assert.ok(picked.length > 0);
   });
 });

@@ -276,11 +276,22 @@ export function randomPair(graph, { minMoves = 2, maxMoves = 14, codePool = null
  * rather than as a real detour a player can reason about, so restrictions
  * are scoped to routes short enough that the twist stays graspable.
  *
+ * minBaseMoves/maxBaseMoves shifted from 3/6 to 5/8 on 2026-09-07, the same
+ * +2 the daily's own difficulty tiers (js/daily.js) and Unlimited's
+ * dropdown (js/main.js) got the day before — otherwise this window, left
+ * pointed at the *old* Easy/Medium boundary, would silently stop matching
+ * any Medium or Hard pair ever again (Medium alone moved from 5-9 to 7-11,
+ * clearing entirely past the old maxBaseMoves of 6). The daily challenge
+ * calls this with an explicit override for already-published days instead
+ * of these defaults — see restrictionsOptsFor() in daily.js — since
+ * changing what a past day's restriction roll used to mean would silently
+ * rewrite a puzzle players already saw.
+ *
  * @param {() => number} rng - a 0..1 random source; pass a seeded one for
  *   deterministic challenges (the daily), or Math.random for one-off runs.
  */
 export function pickRestrictions(graph, startCode, destCode, rng = Math.random, opts = {}) {
-  const { chance = 0.35, maxCount = 2, maxExtraMoves = 4, minBaseMoves = 3, maxBaseMoves = 6 } = opts;
+  const { chance = 0.35, maxCount = 2, maxExtraMoves = 4, minBaseMoves = 5, maxBaseMoves = 8 } = opts;
 
   const basePath = bfsPath(graph, startCode, destCode);
   if (!basePath) return [];

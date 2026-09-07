@@ -4,8 +4,16 @@
 // deliberately flat so a future accounts/database layer can sync the same
 // fields without a migration.
 
+import { addDays } from "./daily.js";
+
 const STORAGE_KEY = "bordercross.stats.v1";
 const STREAK_KEY = "bordercross.streak.v1";
+
+// How many of the most recently-completed calendar days the streak keeps a
+// per-day win/loss record for (see `completed` in emptyStreak() below).
+// Bounded so a long-time player's save file can't grow forever — generous
+// enough that no realistic real streak's trailing chain ever gets truncated.
+const COMPLETED_HISTORY_LIMIT = 1000;
 
 // Buckets extra moves beyond optimal for the distribution chart — "0" is
 // a perfect run, "4+" folds in everything from 4 extra moves up so a
@@ -45,7 +53,16 @@ export function distributionBucket(extraMoves) {
 }
 
 function emptyStreak() {
-  return { current: 0, max: 0, lastCompletedDate: null };
+  // `completed` is a { [dateKey]: won } record of recently-decided daily
+  // challenges — the source of truth `current`/`lastCompletedDate` are
+  // recomputed from on every write (see recordDailyOutcome), rather than
+  // incrementally trusting whatever order completions happened to arrive
+  // in. That matters because of catch-up (main.js): a player can finish
+  // *today's* puzzle, then go back and finish an earlier missed day
+  // afterward, recording that earlier date's outcome out of calendar
+  // order — trusting call order there would treat the earlier win as a
+  // "gap" and wrongly reset the streak instead of bridging it in.
+  return { current: 0, max: 0, lastCompletedDate: null, completed: {} };
 }
 
 export function loadStats() {
@@ -138,9 +155,40 @@ export function resetStats() {
 function loadStreak() {
   try {
     const raw = localStorage.getItem(STREAK_KEY);
-    return raw ? { ...emptyStreak(), ...JSON.parse(raw) } : emptyStreak();
+    if (!raw) return emptyStreak();
+    const streak = { ...emptyStreak(), ...JSON.parse(raw) };
+    streak.completed = { ...(streak.completed || {}) };
+
+    // Migration for saves from before `completed` existed: back-fill it
+    // from exactly what `current`/`lastCompletedDate` already mean — the
+    // `current` most recent calendar days up to and including
+    // lastCompletedDate were wins (and, if the streak was already broken,
+    // lastCompletedDate itself was a loss) — so future out-of-order
+    // catch-up completions still recompute correctly without needing this
+    // player's actual full history.
+    if (streak.lastCompletedDate && Object.keys(streak.completed).length === 0) {
+      if (streak.current > 0) {
+        for (let i = 0; i < streak.current; i++) {
+          streak.completed[addDays(streak.lastCompletedDate, -i)] = true;
+        }
+      } else {
+        streak.completed[streak.lastCompletedDate] = false;
+      }
+    }
+    return streak;
   } catch {
     return emptyStreak();
+  }
+}
+
+/** Keeps the per-day record from growing forever — trims the oldest dates
+ * once it exceeds COMPLETED_HISTORY_LIMIT entries. */
+function pruneCompletedHistory(streak) {
+  const dates = Object.keys(streak.completed);
+  if (dates.length <= COMPLETED_HISTORY_LIMIT) return;
+  dates.sort();
+  for (const date of dates.slice(0, dates.length - COMPLETED_HISTORY_LIMIT)) {
+    delete streak.completed[date];
   }
 }
 
@@ -156,30 +204,40 @@ export function loadStreakStats() {
   return loadStreak();
 }
 
-function daysBetween(earlierDateKey, laterDateKey) {
-  const a = new Date(`${earlierDateKey}T00:00:00`);
-  const b = new Date(`${laterDateKey}T00:00:00`);
-  return Math.round((b - a) / 86400000);
-}
-
 /**
  * Records the outcome of a single day's Classic challenge. Call exactly
  * once per completion (win or give-up) — calling it again for a date
  * that's already recorded is a no-op, so restoring an already-finished
  * day on reload never double-counts.
+ *
+ * `current` is recomputed from the per-day `completed` record every call,
+ * walking backward one calendar day at a time from whichever recorded date
+ * is chronologically most recent, rather than incrementally extending
+ * whatever the previous call left behind. That recomputation (instead of a
+ * `daysBetween(lastCompletedDate, dateKey) === 1` check) is what makes an
+ * out-of-order catch-up completion — finishing today's puzzle, then going
+ * back for an earlier missed day — land in the right place: the earlier
+ * win gets slotted in by its own date, and the chain through today is
+ * re-walked from scratch instead of having already been (wrongly) decided
+ * when today was recorded first.
  */
 export function recordDailyOutcome(dateKey, won) {
   const streak = loadStreak();
-  if (streak.lastCompletedDate === dateKey) return streak;
+  if (Object.prototype.hasOwnProperty.call(streak.completed, dateKey)) return streak;
 
-  if (won) {
-    const gapDays = streak.lastCompletedDate ? daysBetween(streak.lastCompletedDate, dateKey) : null;
-    streak.current = gapDays === 1 ? streak.current + 1 : 1;
-    streak.max = Math.max(streak.max, streak.current);
-  } else {
-    streak.current = 0;
+  streak.completed[dateKey] = won;
+  pruneCompletedHistory(streak);
+
+  const mostRecent = Object.keys(streak.completed).sort().pop();
+  let current = 0;
+  let cursor = mostRecent;
+  while (streak.completed[cursor]) {
+    current += 1;
+    cursor = addDays(cursor, -1);
   }
-  streak.lastCompletedDate = dateKey;
+  streak.current = current;
+  streak.max = Math.max(streak.max, current);
+  streak.lastCompletedDate = mostRecent;
 
   saveStreak(streak);
   return streak;

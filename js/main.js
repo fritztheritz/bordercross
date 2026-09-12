@@ -25,6 +25,7 @@ import {
   addDays,
 } from "./daily.js";
 import { buildShareText, shareResult } from "./share.js";
+import { submitDailyScore } from "./percentile.js";
 import { soundEnabled, setSoundEnabled, playFound, playWrong, playWin } from "./sound.js";
 import { burstConfetti } from "./confetti.js";
 import { loadUnlocked, checkAchievements, resetAchievements } from "./achievements.js";
@@ -43,6 +44,7 @@ import {
   renderRestrictions,
   renderAchievements,
   renderNewAchievements,
+  renderPercentileChart,
 } from "./ui.js";
 
 const els = {
@@ -90,6 +92,7 @@ const els = {
   achievementsProgress: document.getElementById("achievementsProgress"),
   resultHeadline: document.getElementById("resultHeadline"),
   resultBody: document.getElementById("resultBody"),
+  percentileChart: document.getElementById("percentileChart"),
   dailyNextNote: document.getElementById("dailyNextNote"),
   confettiLayer: document.getElementById("confettiLayer"),
   shareBtn: document.getElementById("shareBtn"),
@@ -611,10 +614,30 @@ function showCompletedResult(result) {
   showResultModal(result);
 }
 
+/** Fetches (and submits, harmlessly idempotent if already recorded — see
+ * worker/src/index.js) how today's score compares to everyone else's,
+ * then renders it into the still-open result modal once it resolves.
+ * Classic wins only — Unlimited/Custom have no shared "today" to compare
+ * against, and a give-up has no score to compare in the first place. The
+ * `lastResult !== result` check guards against a slow response landing
+ * after the player has already moved on to a different result (closed
+ * the modal, replayed a catch-up day, started something else). */
+function syncPercentileChart(result) {
+  els.percentileChart.hidden = true;
+  els.percentileChart.innerHTML = "";
+  if (mode !== "classic" || result.status !== "won") return;
+
+  submitDailyScore(currentDailyKey, result.score).then((data) => {
+    if (lastResult !== result) return;
+    renderPercentileChart(els.percentileChart, data && { ...data, ownScore: result.score });
+  });
+}
+
 function showResultModal(result, newlyUnlocked = []) {
   lastResult = result;
   renderResult(els, activeGame, result);
   renderNewAchievements(els.resultBody, newlyUnlocked);
+  syncPercentileChart(result);
   els.countryInput.disabled = true;
   els.hintBtn.disabled = true;
   els.giveUpBtn.disabled = true;

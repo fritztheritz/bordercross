@@ -47,18 +47,20 @@ Then open the printed local URL in a browser.
 ### Tests
 
 The core game logic (graph, scoring, daily-puzzle generation, stats,
-achievements, share text, backup) has no DOM dependency, so it's covered
-by a plain [`node --test`](https://nodejs.org/api/test.html) suite — zero
+achievements, share text, backup, the daily-percentile math) has no DOM
+dependency, so it's covered by a plain
+[`node --test`](https://nodejs.org/api/test.html) suite — zero
 dependencies, nothing to install:
 
 ```bash
 npm test
 ```
 
-`js/main.js`, `js/ui.js`, `js/map.js`, `js/sound.js`, and `js/confetti.js`
-are deliberately untested here — they're the DOM/rendering layer, and
-this suite exists to catch regressions in the rules and data underneath
-it, not to be a full end-to-end harness.
+`js/main.js`, `js/ui.js`, `js/map.js`, `js/sound.js`, `js/confetti.js`,
+and the client half of `js/percentile.js` (the `fetch()` wrapper, not the
+percentile math itself) are deliberately untested here — they're the
+DOM/rendering/network layer, and this suite exists to catch regressions
+in the rules and data underneath it, not to be a full end-to-end harness.
 
 ## How a guess is validated
 
@@ -119,6 +121,7 @@ js/map.js            Leaflet route-map rendering (pan/zoom, no political borders
 js/daily.js          Deterministic daily puzzle (seeded PRNG) + its localStorage persistence
 js/share.js          Wordle-style spoiler-free share text + native share/clipboard
 js/backup.js         Export/import of local progress (stats, streak, achievements)
+js/percentile.js     Submits/fetches the daily "better than X% of players" comparison
 js/sound.js          Synthesized sound effects (Web Audio API, no assets)
 js/confetti.js       CSS-only confetti burst for winning
 js/ui.js             DOM rendering helpers
@@ -128,6 +131,7 @@ manifest.json        Web app manifest (installable/PWA)
 sw.js                Service worker — offline app-shell caching
 test/                node --test suite over the DOM-free modules (see "Tests" above)
 package.json         Just the `npm test` script — the site itself has no dependencies
+worker/              The one server this app has — see "Comparing with today's players" below
 ```
 
 Each layer only talks to the ones below it, so e.g. the scoring formula in
@@ -366,6 +370,32 @@ title — which visibly reordered and re-styled the message in testing. A
 single plain-text blob renders identically (and correctly) everywhere,
 at the cost of never being a genuine embedded link on platforms that
 would have handled the split fields well.
+
+## Comparing with today's players
+
+Winning today's Classic daily shows a "Better than X% of today's players"
+comparison, drawn as a small distribution curve with your own score
+marked on it. This is the one place in the app that isn't purely
+client-side: a small Cloudflare Worker + D1 database (`worker/`) tallies
+everyone's score for the day, since no single browser can know what
+everyone else scored on its own. Everything else in BorderCross — the
+puzzle, stats, achievements, sharing — still works with no account and no
+network dependency at all; this feature is additive and fails silently
+(the comparison just doesn't appear) if the Worker is unreachable or not
+deployed, so it never blocks or breaks the result screen.
+
+`js/percentile.js` submits `{date, score}` (Game's existing 0-100
+`scoreFor()` value) tagged with a random per-browser id — not a real
+identity, only there so the same browser can't inflate a day's count by
+resubmitting. The Worker responds with a percentile and the score
+histogram behind it, both of which `renderPercentileChart()`
+(`js/ui.js`) draws from real submitted data, bucketed into deciles rather
+than plotted per exact score — a niche daily puzzle's day-to-day sample
+is small enough that per-point noise would otherwise dominate the shape.
+Below 5 total submissions for a day, no comparison is shown at all rather
+than a meaningless 0%/100% from one or two data points. Unlimited and
+Custom never show this — there's no shared "today" to compare against.
+See `worker/README.md` for the (one-time, interactive) deploy setup.
 
 ## The map
 

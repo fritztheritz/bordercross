@@ -284,6 +284,120 @@ export function renderTrendChart(container, stats) {
   container.appendChild(caption);
 }
 
+/** Smooths a small set of (x, y) points into a single SVG path — a
+ * quadratic curve through the midpoint of each consecutive pair, using
+ * the real point as that segment's control. No charting library, same
+ * hand-rolled-SVG approach as renderTrendChart() above; just curved
+ * instead of straight since this one plots real bucketed counts (which
+ * read as noisy jitter as straight segments) rather than a trend line. */
+function smoothPath(points) {
+  let d = `M ${points[0][0].toFixed(1)},${points[0][1].toFixed(1)}`;
+  for (let i = 1; i < points.length; i++) {
+    const [px, py] = points[i - 1];
+    const [x, y] = points[i];
+    d += ` Q ${px.toFixed(1)},${py.toFixed(1)} ${((px + x) / 2).toFixed(1)},${((py + y) / 2).toFixed(1)}`;
+  }
+  const [lx, ly] = points[points.length - 1];
+  d += ` T ${lx.toFixed(1)},${ly.toFixed(1)}`;
+  return d;
+}
+
+/** The "better than X% of today's players" comparison for a finished
+ * Classic run — a real distribution built from the score histogram the
+ * backend returns (js/percentile.js), bucketed into deciles rather than
+ * plotted per-integer-score, since a niche daily puzzle's day-to-day
+ * sample is small enough that per-point noise would otherwise dominate
+ * the shape. Hidden entirely (not just empty) when there's no comparison
+ * to show yet — an unreachable API, or too few players so far today. */
+export function renderPercentileChart(container, data) {
+  if (!data || data.percentile == null || !data.histogram || data.histogram.length === 0) {
+    container.hidden = true;
+    container.innerHTML = "";
+    return;
+  }
+  const { percentile, totalPlayers, histogram, ownScore } = data;
+
+  const BUCKET_COUNT = 10; // score ranges 0-9, 10-19, ..., 90-100
+  const buckets = new Array(BUCKET_COUNT).fill(0);
+  for (const { score, count } of histogram) {
+    buckets[Math.min(BUCKET_COUNT - 1, Math.floor(score / BUCKET_COUNT))] += count;
+  }
+  const maxCount = Math.max(...buckets, 1);
+
+  const w = 280;
+  const h = 90;
+  const padX = 6;
+  const padTop = 10;
+  const baseline = h - 20; // room for the axis and the "YOU" label below it
+
+  const points = buckets.map((count, i) => [
+    padX + ((i + 0.5) / BUCKET_COUNT) * (w - padX * 2),
+    baseline - (count / maxCount) * (baseline - padTop),
+  ]);
+  const linePath = smoothPath(points);
+  const areaPath = `${linePath} L ${points[points.length - 1][0].toFixed(1)},${baseline} L ${points[0][0].toFixed(1)},${baseline} Z`;
+
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
+  svg.setAttribute("class", "percentile-svg");
+  svg.setAttribute("role", "img");
+  svg.setAttribute(
+    "aria-label",
+    `Today's score distribution — you beat ${percentile}% of ${totalPlayers} player${totalPlayers === 1 ? "" : "s"}`
+  );
+
+  const area = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  area.setAttribute("d", areaPath);
+  area.setAttribute("class", "percentile-area");
+  svg.appendChild(area);
+
+  const line = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  line.setAttribute("d", linePath);
+  line.setAttribute("class", "percentile-line");
+  svg.appendChild(line);
+
+  const axis = document.createElementNS("http://www.w3.org/2000/svg", "line");
+  axis.setAttribute("x1", padX);
+  axis.setAttribute("x2", w - padX);
+  axis.setAttribute("y1", baseline);
+  axis.setAttribute("y2", baseline);
+  axis.setAttribute("class", "percentile-axis");
+  svg.appendChild(axis);
+
+  const markerX = padX + (Math.min(100, Math.max(0, ownScore)) / 100) * (w - padX * 2);
+  const markerLine = document.createElementNS("http://www.w3.org/2000/svg", "line");
+  markerLine.setAttribute("x1", markerX.toFixed(1));
+  markerLine.setAttribute("x2", markerX.toFixed(1));
+  markerLine.setAttribute("y1", padTop);
+  markerLine.setAttribute("y2", baseline);
+  markerLine.setAttribute("class", "percentile-marker-line");
+  svg.appendChild(markerLine);
+
+  const markerDot = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+  markerDot.setAttribute("cx", markerX.toFixed(1));
+  markerDot.setAttribute("cy", padTop);
+  markerDot.setAttribute("r", "4");
+  markerDot.setAttribute("class", "percentile-marker-dot");
+  svg.appendChild(markerDot);
+
+  const markerLabel = document.createElementNS("http://www.w3.org/2000/svg", "text");
+  markerLabel.setAttribute("x", markerX.toFixed(1));
+  markerLabel.setAttribute("y", h - 4);
+  markerLabel.setAttribute("text-anchor", "middle");
+  markerLabel.setAttribute("class", "percentile-marker-label");
+  markerLabel.textContent = "YOU";
+  svg.appendChild(markerLabel);
+
+  container.innerHTML = "";
+  container.appendChild(svg);
+
+  const caption = document.createElement("p");
+  caption.className = "muted percentile-caption";
+  caption.textContent = `Better than ${percentile}% of today's ${totalPlayers} player${totalPlayers === 1 ? "" : "s"}`;
+  container.appendChild(caption);
+  container.hidden = false;
+}
+
 /** Every achievement, unlocked ones in full color, locked ones dimmed but
  * still showing their icon/title/description — knowing what you're
  * working toward is more motivating than a mystery box. */

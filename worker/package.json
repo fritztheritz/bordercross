@@ -1,0 +1,14 @@
+{
+  "name": "bordercross-scores-worker",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "db:migrate:local": "wrangler d1 execute bordercross-scores --local --file=./schema.sql",
+    "db:migrate:remote": "wrangler d1 execute bordercross-scores --remote --file=./schema.sql"
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0"
+  }
+}

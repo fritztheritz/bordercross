@@ -633,16 +633,18 @@ function showResultModal(result, newlyUnlocked = []) {
   openModal("resultModal");
 }
 
-/** The base app URL for most shares, but a Custom-mode challenge link
- * (?start=XX&dest=YY) for Custom — see tryStartChallengeFromUrl(). Always
- * the site root rather than `location.pathname` verbatim — however this
+/** No URL for Classic/Unlimited — that share is just the Wordle-style
+ * result block, nothing to link to. Custom mode is the one exception: its
+ * share doubles as a challenge link (?start=XX&dest=YY, see
+ * tryStartChallengeFromUrl()) that drops a friend straight into the same
+ * matchup, so the URL there is functional, not decorative. Built off the
+ * site root rather than `location.pathname` verbatim — however this
  * particular visitor arrived (a bookmark to /index.html, a trailing
  * slash-less link, whatever), the shared link should be the one clean
  * canonical URL, not a mirror of however they got here. */
 function shareUrlFor() {
-  const base = `${location.origin}/`;
-  if (mode !== "custom") return base;
-  return `${base}?start=${activeGame.startCode}&dest=${activeGame.destCode}`;
+  if (mode !== "custom") return null;
+  return `${location.origin}/?start=${activeGame.startCode}&dest=${activeGame.destCode}`;
 }
 
 els.shareBtn.addEventListener("click", async () => {

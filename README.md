@@ -327,14 +327,14 @@ country names themselves — and either opens the device's native share
 sheet (`navigator.share`, so on mobile you can send it straight to
 Messages, the same flow as Wordle) or copies it to the clipboard on
 desktop (`js/share.js`). A Classic/daily result includes the puzzle
-number so people can compare the same day's puzzle:
+number so people can compare the same day's puzzle. Classic and Unlimited
+shares carry no URL at all — just the result block, same as Wordle:
 
 ```
 BorderCross #247 🇸🇬 → 🇧🇿
 7 moves (optimal: 4) · 1 hint
 🟨🟩🟩🟨🟩
 🚫 Off-limits: 🇳🇬
-https://bordercross.io/
 ```
 
 The squares follow the actual order guesses were made in, not the tally
@@ -348,11 +348,16 @@ palette (🟦/🟧 instead of 🟩/🟨, a checkbox right on the result modal,
 remembered in `localStorage`) without `Game` needing to know settings
 exist at all.
 
-The clipboard copy actually writes two formats at once (`ClipboardItem`
-with both `text/plain` and `text/html`): plain text looks like the block
-above, with the link as its own trailing line, while the HTML version
-makes "BorderCross" itself the hyperlink instead — whichever a given
-paste target (Slack, Gmail, Notion, ...) supports wins. The link is
+Custom mode is the one exception: its share carries a challenge
+link — `?start=XX&dest=YY` — in place of a bare site URL, so whoever
+opens it lands in that exact pair instead of setting one up themselves
+(`shareUrlFor()` / `tryStartChallengeFromUrl()` in `js/main.js`); the
+query string is stripped from the address bar once consumed. When a share
+does carry a link, the clipboard copy writes two formats at once
+(`ClipboardItem` with both `text/plain` and `text/html`): plain text puts
+the link on its own trailing line, while the HTML version makes
+"BorderCross" itself the hyperlink instead — whichever a given paste
+target (Slack, Gmail, Notion, ...) supports wins. The link is
 deliberately folded into the plain-text body rather than passed to
 `navigator.share()` as a separate `url` field: some share targets (macOS
 Notes, notably) build their own link-preview card out of a separate
@@ -361,12 +366,6 @@ title — which visibly reordered and re-styled the message in testing. A
 single plain-text blob renders identically (and correctly) everywhere,
 at the cost of never being a genuine embedded link on platforms that
 would have handled the split fields well.
-
-A Custom-mode share replaces the app URL with a challenge
-link — `?start=XX&dest=YY` — so whoever opens it lands in that exact
-pair instead of setting one up themselves (`shareUrlFor()` /
-`tryStartChallengeFromUrl()` in `js/main.js`); the query string is
-stripped from the address bar once consumed.
 
 ## The map
 

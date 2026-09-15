@@ -15,11 +15,7 @@
 // counted twice for the same day; see worker/src/index.js for the
 // server side of that.
 
-// TODO: replace with the real *.workers.dev URL (or a custom domain, if
-// one gets routed to it later) once `worker/` is deployed — see
-// worker/README.md for the one-time setup. Until then this feature just
-// fails silently, same as any other unreachable API call here.
-const API_URL = "https://bordercross-scores.bordercross.workers.dev/score";
+const API_URL = "https://bordercross-scores.bordercross-scores-worker.workers.dev/score";
 const ANON_ID_KEY = "bordercross.anonId";
 const REQUEST_TIMEOUT_MS = 5000;
 

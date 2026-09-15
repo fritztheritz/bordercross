@@ -5,4 +5,4 @@ compatibility_date = "2026-09-01"
 [[d1_databases]]
 binding = "DB"
 database_name = "bordercross-scores"
-database_id = "REPLACE_AFTER_WRANGLER_D1_CREATE"
+database_id = "b79e021b-7d4f-487b-87c0-15a0be05109a"

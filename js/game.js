@@ -25,13 +25,18 @@ import { COUNTRY_BY_CODE } from "./graph.js";
 import { bfsPath, bfsDistances, difficultyFor, graphExcluding } from "./graph.js";
 import { resolveCountry } from "./lookup.js";
 
-const HINT_PENALTY = 15;
-
-/** Score for a completed run. Tune here — nothing else depends on the shape. */
-export function scoreFor({ optimalMoves, playerMoves, hintsUsed }) {
+/** Score for a completed run. A hint carries no penalty of its own — see
+ * Game#hint(), it counts as a move like any wrong guess, so its cost already
+ * shows up here via extraMoves. Tune here — nothing else depends on the shape. */
+export function scoreFor({ optimalMoves, playerMoves }) {
   const extraMoves = Math.max(0, playerMoves - optimalMoves);
-  const base = Math.max(0, 100 - extraMoves * 10);
-  return Math.max(0, base - hintsUsed * HINT_PENALTY);
+  return Math.max(0, 100 - extraMoves * 10);
+}
+
+/** Letters of a country name in reading order, skipping spaces/punctuation
+ * (and Unicode-aware, so accented names like "Côte d'Ivoire" hint correctly). */
+function nameLetters(name) {
+  return [...name].filter((ch) => /\p{L}/u.test(ch));
 }
 
 export function efficiencyFor({ optimalMoves, playerMoves }) {
@@ -67,6 +72,9 @@ export class Game {
     this.guessLog = []; // every move-costing guess in order made: { result: "correct"|"redundant"|"wrong"|"arrival", code }
     this.totalMoves = 0; // every guess that "costs" something: slot fills, wrong guesses, redundant alternates
     this.hintsUsed = 0;
+    this.hintSlotIndex = -1; // which slot the *last* hint targeted, for progression
+    this.hintLevel = 0; // hints given in a row for that same slot: 1 = region, 2+ = next letter
+    this.usedLetterHint = false; // ever asked past the region clue, for the "Just a Nudge" achievement
     this.startedAt = null;
     this.finishedAt = null;
     this.status = "playing"; // "playing" | "won" | "gaveup"
@@ -161,21 +169,56 @@ export class Game {
     return { ok: true, code, slotIndex, isNewSlot, remaining: this.slotCount - this.slotsFilled };
   }
 
-  /** A hint reveals the region of the earliest still-unfound step —
-   * concrete enough to actually help, without naming the country. */
+  /** Hints reveal the earliest still-unfound step, and get more specific
+   * each time you ask again *for that same step*: the 1st hint gives its
+   * region, the 2nd gives the country name's first letter, the 3rd gives
+   * its next letter, and so on. Asking a hint for a different step (because
+   * the earlier one got found some other way) starts that progression over.
+   * No separate point penalty — a hint just costs a move, same as any wrong
+   * guess, so scoreFor() already accounts for it via playerMoves. */
   hint() {
     if (this.status !== "playing") return null;
     this.hintsUsed += 1;
+    this.totalMoves += 1;
     const emptyIndex = this.slots.findIndex((s) => s == null);
     if (emptyIndex === -1) return { remaining: 0, hintsUsed: this.hintsUsed };
+
+    if (emptyIndex !== this.hintSlotIndex) {
+      this.hintSlotIndex = emptyIndex;
+      this.hintLevel = 0;
+    }
+    this.hintLevel += 1;
+    if (this.hintLevel >= 2) this.usedLetterHint = true;
+
     const revealCode = this.optimalPath[emptyIndex + 1];
     const region = COUNTRY_BY_CODE.get(revealCode)[4];
+    const letters = nameLetters(this.countryName(revealCode));
+    const letterIndex = this.hintLevel - 2; // 0-based; negative until level 2
+    const letter = letterIndex >= 0 && letterIndex < letters.length ? letters[letterIndex].toUpperCase() : null;
+    const lettersExhausted = letterIndex >= letters.length;
+
     return {
       remaining: this.slotCount - this.slotsFilled,
       stepNumber: emptyIndex + 1,
+      level: this.hintLevel,
+      totalLevels: 1 + letters.length, // region, then one level per letter
       region,
+      letter,
+      lettersExhausted,
       hintsUsed: this.hintsUsed,
     };
+  }
+
+  /** True once the next hint for the current step would repeat itself
+   * (every letter of that step's country already revealed) — used to grey
+   * out the Hint button rather than let a player burn a move on nothing new. */
+  hintExhausted() {
+    const emptyIndex = this.slots.findIndex((s) => s == null);
+    if (emptyIndex === -1) return true;
+    if (emptyIndex !== this.hintSlotIndex) return false; // fresh step — region hint is always new
+    const revealCode = this.optimalPath[emptyIndex + 1];
+    const nextLetterIndex = this.hintLevel - 1; // letterIndex the *next* hint would use
+    return nextLetterIndex >= nameLetters(this.countryName(revealCode)).length;
   }
 
   giveUp() {
@@ -214,7 +257,8 @@ export class Game {
         optimalMoves: this.optimalMoves,
         optimalPath: this.optimalPath,
         hintsUsed: this.hintsUsed,
-        score: scoreFor({ optimalMoves: this.optimalMoves, playerMoves, hintsUsed: this.hintsUsed }),
+        usedLetterHint: this.usedLetterHint,
+        score: scoreFor({ optimalMoves: this.optimalMoves, playerMoves }),
         efficiency: efficiencyFor({ optimalMoves: this.optimalMoves, playerMoves }),
         perfect: playerMoves === this.optimalMoves,
         timeMs,

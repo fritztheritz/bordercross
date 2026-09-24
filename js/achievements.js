@@ -51,6 +51,13 @@ export const ACHIEVEMENTS = [
     check: ({ game, result }) => result?.status === "won" && game?.difficulty === "Hard" && result.hintsUsed === 0,
   },
   {
+    id: "region-hints-only",
+    icon: "🔎",
+    title: "Just a Nudge",
+    description: "Win a route using hints, but never past the region clue.",
+    check: ({ result }) => result?.status === "won" && result.hintsUsed > 0 && !result.usedLetterHint,
+  },
+  {
     id: "restriction-win",
     icon: "🚧",
     title: "Detour Master",

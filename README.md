@@ -147,8 +147,7 @@ un-typed hop onto the destination, so a flawless run with no wrong or
 redundant guesses costs exactly the optimal move count:
 
 - Perfect (optimal) route: **100 points**
-- Each extra move beyond optimal: **−10 points**
-- Each hint used: **−15 points**
+- Each extra move beyond optimal, including hints (see below): **−10 points**
 - Floors at 0
 
 A "redundant" guess is a country that's genuinely on *some* shortest path
@@ -175,10 +174,23 @@ not the first thing you see anymore.
 
 ## Hints and wrong guesses
 
-A hint (`Game#hint()`) reveals the `region` (a coarse tag on each country
-in `js/data.js` — "Southeast Asia", "West Africa", etc., used only for
-this) of the earliest still-unfound step — concrete enough to actually
-narrow things down, without naming the country. Each use costs 15 points.
+A hint (`Game#hint()`) targets the earliest still-unfound step and gets
+more specific each time you ask again *for that same step* — asking about
+a different step (because the earlier one got found some other way)
+starts the progression over:
+
+1. The `region` (a coarse tag on each country in `js/data.js` —
+   "Southeast Asia", "West Africa", etc., used only for this).
+2. The country name's first letter.
+3. Each next letter, one per additional hint, skipping spaces/punctuation
+   (Unicode-aware, so "Côte d'Ivoire" hints its accented letters too).
+
+A hint has no penalty of its own — it just counts as a move, same as a
+wrong guess, so its cost already shows up in the scoring above. The hint
+log shows a `(hint 2/7)`-style counter so it's clear how deep into a name
+you've gone, and once every letter of the current step's country has been
+revealed, `Game#hintExhausted()` greys out the Hint button rather than let
+you burn a move on a hint that would just repeat itself.
 
 Any guess that resolves to a real country but isn't on the shortest route
 is added to `Game#wrongGuesses`, shown in a persistent "Ruled out" list in
@@ -289,11 +301,13 @@ restriction each day without the two draws perturbing each other.
 
 ## Achievements
 
-14 small unlockable milestones (`js/achievements.js`), tracked behind the
+15 small unlockable milestones (`js/achievements.js`), tracked behind the
 🏅 icon in the topbar. Each definition is just a `check(ctx)` predicate run
 against a snapshot of data that already exists — persisted stats, streak,
-the `Game` instance just finished, and its result — so unlocking never
-requires any new gameplay tracking of its own:
+the `Game` instance just finished, and its result — almost all without any
+new gameplay tracking of their own. The one exception is 🔎 Just a Nudge
+below, which needed `Game#usedLetterHint` added specifically to know
+whether a hint ever went past the region clue:
 
 | Achievement | Requirement |
 |---|---|
@@ -303,6 +317,7 @@ requires any new gameplay tracking of its own:
 | 🌍 Globetrotter | Win a Hard-difficulty route |
 | 🥾 Marathoner | Complete a route of 10+ moves |
 | 🧭 Iron Will | Win a Hard route without using a hint |
+| 🔎 Just a Nudge | Win a route using hints, but never past the region clue |
 | 🚧 Detour Master | Win a route with a restriction in play |
 | 🔥 On a Roll | Reach a 3-day streak |
 | 🔥 Weekly Regular | Reach a 7-day streak |

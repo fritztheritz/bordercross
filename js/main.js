@@ -394,7 +394,7 @@ function renderActiveGameView() {
 
   const playing = activeGame.status === "playing";
   els.countryInput.disabled = !playing;
-  els.hintBtn.disabled = !playing;
+  syncHintBtn();
   els.giveUpBtn.disabled = !playing;
 
   map.frame(activeGame.startCode, activeGame.destCode);
@@ -415,6 +415,9 @@ function serializeGame(g) {
     guessLog: g.guessLog,
     totalMoves: g.totalMoves,
     hintsUsed: g.hintsUsed,
+    hintSlotIndex: g.hintSlotIndex,
+    hintLevel: g.hintLevel,
+    usedLetterHint: g.usedLetterHint,
     status: g.status,
     startedAt: g.startedAt,
     finishedAt: g.finishedAt,
@@ -430,6 +433,9 @@ function restoreGame(g, saved) {
   g.guessLog = saved.guessLog || [];
   g.totalMoves = saved.totalMoves ?? saved.acceptedGuesses ?? 0;
   g.hintsUsed = saved.hintsUsed;
+  g.hintSlotIndex = saved.hintSlotIndex ?? -1;
+  g.hintLevel = saved.hintLevel ?? 0;
+  g.usedLetterHint = saved.usedLetterHint ?? false;
   g.status = saved.status;
   g.startedAt = saved.startedAt;
   g.finishedAt = saved.finishedAt;
@@ -756,6 +762,7 @@ function submitMove(rawValue) {
     : `✅ ${activeGame.countryName(result.code)} is also on a shortest route, but that step's already covered`;
   renderFeedback(els, message, "ok", tag);
   renderRouteChain(els, activeGame);
+  syncHintBtn();
   map.render(activeGame);
   if (mode === "classic") persistDaily();
 }
@@ -768,12 +775,23 @@ els.moveForm.addEventListener("submit", (e) => {
 els.hintBtn.addEventListener("click", () => {
   const hint = activeGame.hint();
   if (!hint) return;
-  els.hintLog.textContent =
-    hint.remaining === 0
-      ? `💡 Every step is found — the route will complete on its own. (−15 pts)`
-      : `💡 Step ${hint.stepNumber} of ${activeGame.slotCount} is in ${hint.region}. (−15 pts)`;
+  els.hintLog.textContent = hintMessage(hint);
+  syncHintBtn();
   if (mode === "classic") persistDaily();
 });
+
+function syncHintBtn() {
+  els.hintBtn.disabled = activeGame.status !== "playing" || activeGame.hintExhausted();
+}
+
+function hintMessage(hint) {
+  if (hint.remaining === 0) return "💡 Every step is found — the route will complete on its own.";
+  const counter = `(hint ${hint.level}/${hint.totalLevels})`;
+  if (hint.level === 1) return `💡 Step ${hint.stepNumber} of ${activeGame.slotCount} is in ${hint.region}. ${counter}`;
+  if (hint.lettersExhausted) return "💡 You've got every letter now — you can name it.";
+  const lead = hint.level === 2 ? "It starts with the letter" : "The next letter is";
+  return `💡 ${lead} ${hint.letter}. ${counter}`;
+}
 
 els.giveUpBtn.addEventListener("click", () => {
   if (!confirm("Give up and reveal the optimal route? This ends the current game.")) return;

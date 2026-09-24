@@ -11,15 +11,14 @@ function makeRng(values) {
 }
 
 describe("scoreFor / efficiencyFor", () => {
-  test("a perfect run with no hints scores 100", () => {
-    assert.equal(scoreFor({ optimalMoves: 3, playerMoves: 3, hintsUsed: 0 }), 100);
+  test("a perfect run scores 100", () => {
+    assert.equal(scoreFor({ optimalMoves: 3, playerMoves: 3 }), 100);
     assert.equal(efficiencyFor({ optimalMoves: 3, playerMoves: 3 }), 100);
   });
 
-  test("extra moves and hints both cost points, floored at 0", () => {
-    assert.equal(scoreFor({ optimalMoves: 3, playerMoves: 5, hintsUsed: 0 }), 80); // -10 x 2 extra
-    assert.equal(scoreFor({ optimalMoves: 3, playerMoves: 3, hintsUsed: 1 }), 85);
-    assert.equal(scoreFor({ optimalMoves: 3, playerMoves: 20, hintsUsed: 10 }), 0);
+  test("extra moves cost 10 points each, floored at 0", () => {
+    assert.equal(scoreFor({ optimalMoves: 3, playerMoves: 5 }), 80); // -10 x 2 extra
+    assert.equal(scoreFor({ optimalMoves: 3, playerMoves: 20 }), 0);
   });
 });
 
@@ -93,13 +92,64 @@ describe("Game", () => {
     assert.deepEqual(game.guessOutcomes(), ["wrong", "correct", "blank"]);
   });
 
-  test("hint reveals the earliest unfound step's real region and counts hintsUsed", () => {
+  test("first hint on a step reveals its region, and costs a move like any other guess", () => {
     const game = new Game(graph);
     game.start("CA", "GT");
     const hint = game.hint();
     assert.equal(hint.stepNumber, 1);
+    assert.equal(hint.level, 1);
     assert.equal(hint.region, COUNTRY_BY_CODE.get("US")[4]);
+    assert.equal(hint.letter, null);
     assert.equal(game.hintsUsed, 1);
+    assert.equal(game.totalMoves, 1); // no separate point penalty — it's just a move
+  });
+
+  test("asking again for the same still-unfound step reveals the country name letter by letter", () => {
+    const game = new Game(graph);
+    game.start("CA", "GT"); // step 1 is United States
+    game.hint(); // region
+    const h2 = game.hint();
+    assert.equal(h2.level, 2);
+    assert.equal(h2.letter, "U");
+    const h3 = game.hint();
+    assert.equal(h3.level, 3);
+    assert.equal(h3.letter, "N"); // "U-n-i-t-e-d" — second letter
+    assert.equal(game.totalMoves, 3);
+  });
+
+  test("hinting a different step (found another way) restarts the progression at region", () => {
+    const game = new Game(graph);
+    game.start("CA", "GT");
+    game.hint(); // region for step 1 (US)
+    game.hint(); // first letter for step 1
+    game.attemptMove("United States"); // fills step 1 for real
+    const hint = game.hint(); // now targets step 2 (Mexico)
+    assert.equal(hint.stepNumber, 2);
+    assert.equal(hint.level, 1);
+    assert.equal(hint.letter, null);
+  });
+
+  test("hintExhausted() is false for a fresh step, true once every letter's been revealed", () => {
+    const game = new Game(graph);
+    game.start("CA", "GT"); // step 1 is United States: U-n-i-t-e-d S-t-a-t-e-s, 12 letters
+    assert.equal(game.hintExhausted(), false);
+    const first = game.hint();
+    assert.equal(first.totalLevels, 13); // region + 12 letters
+    assert.equal(game.hintExhausted(), false);
+    for (let i = 0; i < 12; i++) game.hint(); // levels 2..13: all 12 letters now revealed
+    assert.equal(game.hintExhausted(), true);
+  });
+
+  test("usedLetterHint only flips once a hint goes past the region clue", () => {
+    const game = new Game(graph);
+    game.start("CA", "GT");
+    game.hint(); // region only, for step 1
+    assert.equal(game.usedLetterHint, false);
+    game.attemptMove("United States");
+    game.hint(); // region only, for step 2
+    assert.equal(game.usedLetterHint, false);
+    game.hint(); // now asks for a letter
+    assert.equal(game.usedLetterHint, true);
   });
 
   test("start/destination with no intermediates auto-wins with exactly 1 move", () => {

@@ -191,6 +191,8 @@ button {
 }
 
 .btn:hover { border-color: var(--accent); }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn:disabled:hover { border-color: var(--hairline-strong); }
 
 .btn-primary {
   background: var(--accent);

@@ -28,6 +28,20 @@ describe("checkAchievements", () => {
     assert.ok(most.some((a) => a.id === "explorer-150"));
   });
 
+  test("'region-hints-only' needs at least one hint, and never a letter-level one", () => {
+    const stats = {};
+    const noHints = checkAchievements({ stats, result: { status: "won", hintsUsed: 0, usedLetterHint: false } });
+    assert.ok(!noHints.some((a) => a.id === "region-hints-only"));
+
+    resetAchievements();
+    const withLetter = checkAchievements({ stats, result: { status: "won", hintsUsed: 2, usedLetterHint: true } });
+    assert.ok(!withLetter.some((a) => a.id === "region-hints-only"));
+
+    resetAchievements();
+    const regionOnly = checkAchievements({ stats, result: { status: "won", hintsUsed: 1, usedLetterHint: false } });
+    assert.ok(regionOnly.some((a) => a.id === "region-hints-only"));
+  });
+
   test("every achievement id is unique", () => {
     const ids = ACHIEVEMENTS.map((a) => a.id);
     assert.equal(new Set(ids).size, ids.length);

@@ -216,6 +216,19 @@
     </div>
   </div>
 
+  <!-- Confirm / alert dialog — reused for every in-app confirmation instead
+       of native confirm()/alert(), which can't be themed and look out of
+       place next to the rest of the app's own modal system. -->
+  <div class="modal-backdrop" id="confirmModal" hidden>
+    <div class="modal modal-confirm" role="alertdialog" aria-modal="true" aria-describedby="confirmMessage">
+      <p id="confirmMessage"></p>
+      <div class="modal-actions">
+        <button type="button" class="btn" id="confirmCancelBtn">Cancel</button>
+        <button type="button" class="btn btn-primary" id="confirmOkBtn">OK</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Custom mode picker -->
   <div class="modal-backdrop" id="customModal" hidden>
     <div class="modal" role="dialog" aria-modal="true" aria-labelledby="customTitle">
@@ -268,14 +281,33 @@
     </div>
   </div>
 
+  <!-- New version notice — see the controllerchange listener below -->
+  <div class="update-toast" id="updateToast" hidden role="status">
+    <span>A new version of BorderCross is available.</span>
+    <div class="update-toast-actions">
+      <button type="button" class="btn btn-ghost" id="updateDismissBtn">Dismiss</button>
+      <button type="button" class="btn btn-primary" id="updateRefreshBtn">Refresh</button>
+    </div>
+  </div>
+
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script type="module" src="js/main.js"></script>
   <script>
+    const hadServiceWorkerController = !!navigator.serviceWorker?.controller;
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", () => {
         navigator.serviceWorker.register("sw.js").catch(() => {
           // Offline support just won't be available — the game still works online.
         });
+      });
+      // sw.js calls skipWaiting()+clients.claim(), so a new version takes
+      // over immediately rather than waiting for every tab to close — but
+      // JS modules already loaded in this tab don't swap themselves out, so
+      // surface a refresh prompt instead of silently running a stale build.
+      // Only fires for a genuine update (this tab was already controlled
+      // before the swap); never on first install.
+      navigator.serviceWorker.addEventListener("controllerchange", () => {
+        if (hadServiceWorkerController) window.dispatchEvent(new CustomEvent("bordercross:update-available"));
       });
     }
   </script>

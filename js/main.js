@@ -107,6 +107,12 @@ const els = {
   customDestSuggestions: document.getElementById("customDestSuggestions"),
   customStartBtn: document.getElementById("customStartBtn"),
   customError: document.getElementById("customError"),
+  confirmMessage: document.getElementById("confirmMessage"),
+  confirmOkBtn: document.getElementById("confirmOkBtn"),
+  confirmCancelBtn: document.getElementById("confirmCancelBtn"),
+  updateToast: document.getElementById("updateToast"),
+  updateRefreshBtn: document.getElementById("updateRefreshBtn"),
+  updateDismissBtn: document.getElementById("updateDismissBtn"),
 };
 
 const graph = buildGraph();
@@ -126,24 +132,36 @@ let currentDailyKey = todayKey();
 
 // ---------- Modals ----------
 
-// Tracks whatever had focus right before a modal opened, so closing it
-// (✕, Escape, or a backdrop click) returns focus there instead of
-// stranding a keyboard/screen-reader user at the top of the document.
-let lastFocusedBeforeModal = null;
+// Modals can now nest (a confirmDialog() opened from inside Stats, say), so
+// this is a stack, not a single slot: each entry remembers what had focus
+// right before *that* modal opened, and Escape closes only the topmost one
+// rather than whichever happens to come first in document order.
+const modalStack = []; // { id, previousFocus }
+
+// A confirmDialog()/alertDialog() promise waiting to be resolved, keyed by
+// modal id — closing that modal any way *other* than its own OK button
+// (✕, Escape, backdrop click) resolves it as cancelled. See below.
+const dialogResolvers = new Map();
 
 function openModal(id) {
   const modal = document.getElementById(id);
-  lastFocusedBeforeModal = document.activeElement;
+  modalStack.push({ id, previousFocus: document.activeElement });
   modal.hidden = false;
-  // Move focus into the modal itself — the close button is always present
-  // and always a sensible first stop, so it doubles as the modal's focus
-  // target rather than hunting for the "most relevant" field.
-  modal.querySelector(".icon-btn[data-close]")?.focus();
+  // Move focus into the modal itself — the close button is the usual first
+  // stop; the confirm dialog has none, so fall back to its first button.
+  const focusTarget = modal.querySelector(".icon-btn[data-close]") || modal.querySelector(".btn");
+  focusTarget?.focus();
 }
 function closeModal(id) {
   document.getElementById(id).hidden = true;
-  lastFocusedBeforeModal?.focus?.();
-  lastFocusedBeforeModal = null;
+  const idx = modalStack.map((m) => m.id).lastIndexOf(id);
+  const [entry] = idx !== -1 ? modalStack.splice(idx, 1) : [];
+  entry?.previousFocus?.focus?.();
+  const resolve = dialogResolvers.get(id);
+  if (resolve) {
+    dialogResolvers.delete(id);
+    resolve(false);
+  }
 }
 document.querySelectorAll("[data-close]").forEach((btn) => {
   btn.addEventListener("click", () => closeModal(btn.dataset.close));
@@ -155,10 +173,48 @@ document.querySelectorAll(".modal-backdrop").forEach((backdrop) => {
 });
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") {
-    const open = document.querySelector(".modal-backdrop:not([hidden])");
-    if (open) closeModal(open.id);
+    const top = modalStack[modalStack.length - 1];
+    if (top) closeModal(top.id);
   }
 });
+
+// ---------- Confirm / alert dialog ----------
+// A themed in-app replacement for native confirm()/alert() — reuses the
+// one #confirmModal, so only one can be showing at a time.
+
+function confirmDialog(message, { okLabel = "OK", danger = false } = {}) {
+  return new Promise((resolve) => {
+    els.confirmMessage.textContent = message;
+    els.confirmCancelBtn.hidden = false;
+    els.confirmOkBtn.textContent = okLabel;
+    els.confirmOkBtn.classList.toggle("btn-danger", danger);
+    els.confirmOkBtn.classList.toggle("btn-primary", !danger);
+    dialogResolvers.set("confirmModal", resolve);
+    openModal("confirmModal");
+  });
+}
+
+/** Same dialog with just an acknowledgement button — for messages that
+ * aren't really a yes/no choice (a completed import, a read error). */
+function alertDialog(message) {
+  return new Promise((resolve) => {
+    els.confirmMessage.textContent = message;
+    els.confirmCancelBtn.hidden = true;
+    els.confirmOkBtn.textContent = "OK";
+    els.confirmOkBtn.classList.remove("btn-danger");
+    els.confirmOkBtn.classList.add("btn-primary");
+    dialogResolvers.set("confirmModal", () => resolve());
+    openModal("confirmModal");
+  });
+}
+
+els.confirmOkBtn.addEventListener("click", () => {
+  const resolve = dialogResolvers.get("confirmModal");
+  dialogResolvers.delete("confirmModal");
+  closeModal("confirmModal");
+  resolve?.(true);
+});
+els.confirmCancelBtn.addEventListener("click", () => closeModal("confirmModal"));
 
 // ---------- Theme ----------
 
@@ -576,8 +632,22 @@ function openCustomPicker() {
   openModal("customModal");
 }
 
-els.newGameBtn.addEventListener("click", () => {
+/** Give Up already confirms before discarding an in-progress run — New Game
+ * silently did the exact same thing in Unlimited (Custom is safe already:
+ * its picker is itself a pause the player can back out of before anything
+ * is actually discarded). Only interrupts when there's real progress to
+ * lose, so a fresh or already-finished run still swaps instantly. */
+async function confirmAbandonIfNeeded() {
+  if (activeGame.status !== "playing" || activeGame.guessedCodes.size === 0) return true;
+  return confirmDialog("Start a new game? Your progress on this route will be lost.", {
+    okLabel: "New Game",
+    danger: true,
+  });
+}
+
+els.newGameBtn.addEventListener("click", async () => {
   if (mode === "unlimited") {
+    if (!(await confirmAbandonIfNeeded())) return;
     startNewUnlimitedGame();
     renderActiveGameView();
   } else if (mode === "custom") {
@@ -793,8 +863,12 @@ function hintMessage(hint) {
   return `💡 ${lead} ${hint.letter}. ${counter}`;
 }
 
-els.giveUpBtn.addEventListener("click", () => {
-  if (!confirm("Give up and reveal the optimal route? This ends the current game.")) return;
+els.giveUpBtn.addEventListener("click", async () => {
+  const ok = await confirmDialog("Give up and reveal the optimal route? This ends the current game.", {
+    okLabel: "Give Up",
+    danger: true,
+  });
+  if (!ok) return;
   activeGame.giveUp();
   finishGame(activeGame.result());
 });
@@ -812,8 +886,9 @@ els.statsBtn.addEventListener("click", () => {
   refreshStatsView();
   openModal("statsModal");
 });
-els.resetStatsBtn.addEventListener("click", () => {
-  if (!confirm("Reset all statistics? This can't be undone.")) return;
+els.resetStatsBtn.addEventListener("click", async () => {
+  const ok = await confirmDialog("Reset all statistics? This can't be undone.", { okLabel: "Reset", danger: true });
+  if (!ok) return;
   resetStats();
   resetAchievements();
   refreshStatsView();
@@ -835,22 +910,26 @@ els.importProgressInput.addEventListener("change", async () => {
   const file = els.importProgressInput.files[0];
   els.importProgressInput.value = ""; // let the same file be re-picked later if needed
   if (!file) return;
-  if (!confirm("Import progress from this file? This replaces your current stats, streak, and achievements.")) return;
+  const ok = await confirmDialog(
+    "Import progress from this file? This replaces your current stats, streak, and achievements.",
+    { okLabel: "Import", danger: true }
+  );
+  if (!ok) return;
 
   let parsed;
   try {
     parsed = JSON.parse(await file.text());
   } catch {
-    alert("Couldn't read that file — make sure it's a BorderCross progress export.");
+    await alertDialog("Couldn't read that file — make sure it's a BorderCross progress export.");
     return;
   }
   const result = importProgress(parsed);
   if (!result.ok) {
-    alert(result.error);
+    await alertDialog(result.error);
     return;
   }
   refreshStatsView();
-  alert("Progress imported.");
+  await alertDialog("Progress imported.");
 });
 els.howToBtn.addEventListener("click", () => openModal("howToModal"));
 els.achievementsBtn.addEventListener("click", () => {
@@ -934,6 +1013,39 @@ function tryStartChallengeFromUrl() {
   return true;
 }
 
+// ---------- Service worker updates ----------
+// See the controllerchange listener in index.html for why this is needed
+// at all: skipWaiting()+clients.claim() in sw.js mean a new version takes
+// over the moment it's deployed, but the JS already running in this tab
+// doesn't refresh itself, so without this a player can be stuck on a stale
+// build indefinitely with nothing telling them to reload.
+
+window.addEventListener("bordercross:update-available", () => {
+  els.updateToast.hidden = false;
+});
+els.updateRefreshBtn.addEventListener("click", () => location.reload());
+els.updateDismissBtn.addEventListener("click", () => {
+  els.updateToast.hidden = true;
+});
+
+// ---------- First-visit onboarding ----------
+
+const ONBOARDED_KEY = "bordercross.onboarded";
+
+/** Opens the same "How to play" modal a returning player finds behind the
+ * ? icon, but automatically, once, the first time this browser ever shows
+ * up — so a new player doesn't have to already know the rules are
+ * documented somewhere in order to go find them. */
+function maybeShowFirstVisitHelp() {
+  try {
+    if (localStorage.getItem(ONBOARDED_KEY)) return;
+    localStorage.setItem(ONBOARDED_KEY, "1");
+  } catch {
+    return; // storage unavailable — skip rather than risk showing every load
+  }
+  openModal("howToModal");
+}
+
 // ---------- Boot ----------
 
 loadDailyPuzzle();
@@ -941,3 +1053,4 @@ tryStartChallengeFromUrl();
 renderActiveGameView();
 if (activeGame.status !== "playing") showCompletedResult(activeGame.result());
 startCountdown();
+maybeShowFirstVisitHelp();

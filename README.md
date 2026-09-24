@@ -571,6 +571,16 @@ Safari and Firefox never fire this event at all — there's no equivalent
 programmatic prompt on those browsers, so the banner just never appears
 there, which is the correct outcome rather than a gap to fill.
 
+`sw.js` also calls `skipWaiting()` and `clients.claim()`, so a newly
+deployed version takes over the moment it's installed rather than waiting
+for every open tab to close — but the JS a tab already has loaded doesn't
+swap itself out just because the worker behind it changed. `index.html`
+captures whether this tab already had an active controller before
+registering, and only if it did (ruling out a first-ever install) does a
+later `controllerchange` event fire a `bordercross:update-available`
+event; `js/main.js` turns that into a small "Refresh" toast rather than
+leaving a player stuck on a stale build with nothing telling them.
+
 ## Backing up your progress
 
 Stats, streak, and achievements (see above) live only in this browser's

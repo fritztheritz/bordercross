@@ -21,6 +21,18 @@ export function renderTicket(els, { startEntry, destEntry, optimalMoves }) {
   els.difficultyBadge.className = `difficulty-badge difficulty-${difficulty.toLowerCase()}`;
 }
 
+/** `count` is null on any fetch failure or before it resolves — hides the
+ * badge entirely rather than show a broken/zero count, same graceful
+ * degradation as the percentile chart. */
+export function renderPlayersToday(el, count) {
+  if (typeof count !== "number") {
+    el.hidden = true;
+    return;
+  }
+  el.textContent = `🌍 ${count.toLocaleString()} played today`;
+  el.hidden = false;
+}
+
 /** Renders Start → [found or blank slot] × N → Destination. Slots can be
  * filled in any order (see game.js), but always display in their correct
  * position, so the chain reads correctly regardless of discovery order. */
@@ -121,10 +133,18 @@ export function attachAutocomplete(input, box, { onSelect, excludeCodes = () => 
   let items = [];
   let activeIndex = -1;
 
+  // The input carries role="combobox" pointing at this listbox (see
+  // index.html) — arrow-key navigation already worked visually via the
+  // `.active` class, but without these three attributes a screen reader
+  // never announced which suggestion was current as you arrowed through.
+  const optionId = (i) => `${box.id}-option-${i}`;
+
   function close() {
     box.innerHTML = "";
     items = [];
     activeIndex = -1;
+    input.setAttribute("aria-expanded", "false");
+    input.removeAttribute("aria-activedescendant");
   }
 
   function renderItems() {
@@ -132,8 +152,10 @@ export function attachAutocomplete(input, box, { onSelect, excludeCodes = () => 
     items.forEach((country, i) => {
       const btn = document.createElement("button");
       btn.type = "button";
+      btn.id = optionId(i);
       btn.className = "suggestion-item" + (i === activeIndex ? " active" : "");
       btn.setAttribute("role", "option");
+      btn.setAttribute("aria-selected", String(i === activeIndex));
       btn.append(flagIconEl(country[0]), document.createTextNode(` ${country[1]}`));
       btn.addEventListener("mousedown", (e) => {
         e.preventDefault();
@@ -143,6 +165,9 @@ export function attachAutocomplete(input, box, { onSelect, excludeCodes = () => 
       });
       box.appendChild(btn);
     });
+    input.setAttribute("aria-expanded", String(items.length > 0));
+    if (activeIndex >= 0) input.setAttribute("aria-activedescendant", optionId(activeIndex));
+    else input.removeAttribute("aria-activedescendant");
   }
 
   input.addEventListener("input", () => {

@@ -15,7 +15,7 @@
 // counted twice for the same day; see worker/src/index.js for the
 // server side of that.
 
-const API_URL = "https://bordercross-scores.bordercross-scores-worker.workers.dev/score";
+const API_BASE = "https://bordercross-scores.bordercross-scores-worker.workers.dev";
 const ANON_ID_KEY = "bordercross.anonId";
 const REQUEST_TIMEOUT_MS = 5000;
 
@@ -32,6 +32,24 @@ function anonId() {
   }
 }
 
+/** Shared by every call this module makes: same timeout, same "any failure
+ * at all just means null" contract, so every caller below can stay a
+ * one-line wrapper around this instead of repeating the AbortController
+ * dance. */
+async function fetchJson(path, options) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    const res = await fetch(`${API_BASE}${path}`, { ...options, signal: controller.signal });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 /**
  * Submits today's score and returns how it stacks up. Always safe to
  * await and ignore a null result (network failure, timeout, or a sample
@@ -39,21 +57,24 @@ function anonId() {
  * @returns {Promise<{percentile: number, totalPlayers: number, histogram: {score:number,count:number}[]|null}|null>}
  */
 export async function submitDailyScore(dateKey, score) {
-  try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-    const res = await fetch(API_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ date: dateKey, score, anonId: anonId() }),
-      signal: controller.signal,
-    }).finally(() => clearTimeout(timeout));
+  const data = await fetchJson("/score", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ date: dateKey, score, anonId: anonId() }),
+  });
+  if (!data || typeof data.percentile !== "number") return null;
+  return { percentile: data.percentile, totalPlayers: data.totalPlayers, histogram: data.histogram || null };
+}
 
-    if (!res.ok) return null;
-    const data = await res.json();
-    if (typeof data.percentile !== "number") return null;
-    return { percentile: data.percentile, totalPlayers: data.totalPlayers, histogram: data.histogram || null };
-  } catch {
-    return null;
-  }
+/**
+ * How many players have completed today's puzzle so far — unlike
+ * submitDailyScore()'s comparison, this doesn't need your own score or a
+ * minimum sample, so it's safe to show before you've even played. Same
+ * silent-failure contract: a null result means don't show anything, never
+ * a visible error.
+ * @returns {Promise<number|null>}
+ */
+export async function fetchPlayersToday(dateKey) {
+  const data = await fetchJson(`/players?date=${encodeURIComponent(dateKey)}`);
+  return typeof data?.totalPlayers === "number" ? data.totalPlayers : null;
 }

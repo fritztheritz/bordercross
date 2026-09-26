@@ -25,7 +25,7 @@ import {
   addDays,
 } from "./daily.js";
 import { buildShareText, shareResult } from "./share.js";
-import { submitDailyScore } from "./percentile.js";
+import { submitDailyScore, fetchPlayersToday } from "./percentile.js";
 import { soundEnabled, setSoundEnabled, playFound, playWrong, playWin } from "./sound.js";
 import { burstConfetti } from "./confetti.js";
 import { loadUnlocked, checkAchievements, resetAchievements } from "./achievements.js";
@@ -45,6 +45,7 @@ import {
   renderAchievements,
   renderNewAchievements,
   renderPercentileChart,
+  renderPlayersToday,
 } from "./ui.js";
 
 const els = {
@@ -55,6 +56,7 @@ const els = {
   optimalMovesText: document.getElementById("optimalMovesText"),
   difficultyBadge: document.getElementById("difficultyBadge"),
   dailyNumber: document.getElementById("dailyNumber"),
+  playersToday: document.getElementById("playersToday"),
   routeChain: document.getElementById("routeChain"),
   moveForm: document.getElementById("moveForm"),
   countryInput: document.getElementById("countryInput"),
@@ -222,10 +224,16 @@ const THEME_KEY = "bordercross.theme";
 const THEME_CYCLE = ["system", "light", "dark"];
 const THEME_ICON = { system: "◐", light: "☀", dark: "☾" };
 
+const THEME_LABEL = { system: "System", light: "Light", dark: "Dark" };
+
 function applyTheme(theme) {
   if (theme === "system") document.documentElement.removeAttribute("data-theme");
   else document.documentElement.setAttribute("data-theme", theme);
   els.themeBtn.textContent = THEME_ICON[theme];
+  // A three-way cycle doesn't fit aria-pressed (that's for a two-state
+  // toggle), so the accessible name itself carries the current mode —
+  // same information a sighted user gets from the icon change.
+  els.themeBtn.setAttribute("aria-label", `Theme: ${THEME_LABEL[theme]}`);
   try {
     localStorage.setItem(THEME_KEY, theme);
   } catch {}
@@ -248,7 +256,10 @@ els.themeBtn.addEventListener("click", () => {
 // ---------- Sound ----------
 
 function syncSoundButton() {
-  els.soundBtn.textContent = soundEnabled() ? "🔊" : "🔇";
+  const on = soundEnabled();
+  els.soundBtn.textContent = on ? "🔊" : "🔇";
+  els.soundBtn.setAttribute("aria-pressed", String(on));
+  els.soundBtn.setAttribute("aria-label", on ? "Sound on" : "Sound off");
 }
 syncSoundButton();
 
@@ -440,6 +451,7 @@ function renderActiveGameView() {
   els.dailyNumber.hidden = mode !== "classic";
   if (mode === "classic") els.dailyNumber.textContent = `Daily #${puzzleNumber(currentDailyKey)}`;
   syncCatchUpBanner();
+  syncPlayersToday();
 
   renderRouteChain(els, activeGame);
   renderWrongGuesses(els, activeGame);
@@ -539,6 +551,22 @@ function canReplayYesterday() {
 
 function syncCatchUpBanner() {
   els.catchUpBanner.hidden = mode !== "classic" || isReplayingPastDay || !canReplayYesterday();
+}
+
+/** Classic only — Unlimited/Custom have no shared "today" for this to mean
+ * anything. Unlike the result modal's percentile comparison, this doesn't
+ * need the player's own score, so it's shown up front rather than gated
+ * behind a win. The `currentDailyKey` check guards against a slow response
+ * landing after the player has switched days or modes in the meantime. */
+function syncPlayersToday() {
+  if (mode !== "classic") {
+    els.playersToday.hidden = true;
+    return;
+  }
+  const dateKey = currentDailyKey;
+  fetchPlayersToday(dateKey).then((count) => {
+    if (mode === "classic" && currentDailyKey === dateKey) renderPlayersToday(els.playersToday, count);
+  });
 }
 
 function returnToToday() {
@@ -714,6 +742,7 @@ function showResultModal(result, newlyUnlocked = []) {
   renderResult(els, activeGame, result);
   renderNewAchievements(els.resultBody, newlyUnlocked);
   syncPercentileChart(result);
+  syncPlayersToday();
   els.countryInput.disabled = true;
   els.hintBtn.disabled = true;
   els.giveUpBtn.disabled = true;

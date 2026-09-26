@@ -3,14 +3,19 @@
 The one server this app has. Everything else in BorderCross (the puzzle
 itself, stats, achievements, sharing) runs entirely client-side with no
 account and no network dependency — see the repo root README. This is a
-tiny Cloudflare Worker + D1 database that exists purely to answer "how did
-today's score compare to everyone else's," which no single browser can
-know on its own. It's used by exactly one place in the frontend:
-`js/percentile.js`.
+tiny Cloudflare Worker + D1 database that exists purely to answer two
+questions no single browser can answer on its own, both used from
+`js/percentile.js`:
+
+- `POST /score` — submit today's score, get back "how did that compare"
+  (percentile + histogram), once enough people have played.
+- `GET /players?date=YYYY-MM-DD` — a plain headcount of how many players
+  have finished that day's puzzle, shown in the ticket header before a
+  player has even played.
 
 If this Worker is ever unreachable, deleted, or simply not deployed yet,
-the frontend fails silently — the "better than X%" comparison just
-doesn't appear. Nothing else in the game depends on it.
+the frontend fails silently — the comparison and the headcount both just
+don't appear. Nothing else in the game depends on it.
 
 ## One-time setup
 
@@ -32,8 +37,8 @@ npx wrangler deploy
 
 `wrangler deploy` prints the Worker's live URL — something like
 `https://bordercross-scores.<your-account-subdomain>.workers.dev`. Copy
-that (with `/score` appended) into `API_URL` at the top of
-`../js/percentile.js`, replacing the placeholder there, then commit.
+that into `API_BASE` at the top of `../js/percentile.js`, replacing the
+placeholder there, then commit.
 
 ## Local development
 
@@ -67,5 +72,9 @@ score. That's an accepted trade-off for a free, accountless daily game.
 The percentile math itself (`src/percentile.js`) is plain, D1-free JS —
 it's covered by `../test/percentile.test.js`, which runs as part of the
 repo's normal `npm test`. The D1/HTTP wiring in `src/index.js` isn't unit
-tested; verify it with `wrangler dev` + a couple of `curl -X POST` calls,
-or just deploy and watch it work end to end.
+tested; verify it with `wrangler dev` + a few `curl` calls against both
+routes — POST a couple of scores for a throwaway date, then GET
+`/players?date=` for that same date and confirm the count matches, and
+again for a date with no submissions at all (should come back `0`, not an
+error — the SQL `SUM()`-over-nothing case) — or just deploy and watch it
+work end to end.

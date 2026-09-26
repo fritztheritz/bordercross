@@ -25,7 +25,7 @@ const ALLOWED_ORIGINS = [/^https:\/\/(www\.)?bordercross\.io$/, /^http:\/\/local
 
 function corsHeaders(origin) {
   const headers = {
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type",
   };
   if (origin && ALLOWED_ORIGINS.some((re) => re.test(origin))) {
@@ -44,11 +44,31 @@ function json(data, status, origin) {
 export default {
   async fetch(request, env) {
     const origin = request.headers.get("Origin");
+    const url = new URL(request.url);
 
     if (request.method === "OPTIONS") return new Response(null, { headers: corsHeaders(origin) });
-    if (request.method !== "POST") return json({ error: "method not allowed" }, 405, origin);
 
-    const url = new URL(request.url);
+    // GET /players?date=YYYY-MM-DD — a plain headcount of how many players
+    // have completed today's puzzle so far. Deliberately a separate,
+    // unauthenticated-and-always-answerable endpoint from POST /score below:
+    // the ticket header wants to show this before a player has even played
+    // (so it can't wait on their own submission), and a headcount alone
+    // reveals nothing that would need the MIN_SAMPLE floor /score applies
+    // to its percentile/histogram — see percentile.js.
+    if (request.method === "GET" && url.pathname === "/players") {
+      const date = url.searchParams.get("date") || "";
+      if (!DATE_RE.test(date)) return json({ error: "invalid date" }, 400, origin);
+
+      // SUM() over zero matching rows returns SQL NULL, not 0 (a brand-new
+      // day, or one nobody's finished yet) — the `|| 0` below is load-bearing.
+      const { totalPlayers } = await env.DB.prepare("SELECT SUM(count) as totalPlayers FROM score_counts WHERE date_key = ?")
+        .bind(date)
+        .first();
+
+      return json({ totalPlayers: totalPlayers || 0 }, 200, origin);
+    }
+
+    if (request.method !== "POST") return json({ error: "method not allowed" }, 405, origin);
     if (url.pathname !== "/score") return json({ error: "not found" }, 404, origin);
 
     let body;

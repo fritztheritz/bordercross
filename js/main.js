@@ -796,18 +796,18 @@ function showResultModal(result, newlyUnlocked = []) {
   openModal("resultModal");
 }
 
-/** No URL for Classic/Unlimited — that share is just the Wordle-style
- * result block, nothing to link to. Custom mode is the one exception: its
- * share doubles as a challenge link (?start=XX&dest=YY, see
- * tryStartChallengeFromUrl()) that drops a friend straight into the same
- * matchup, so the URL there is functional, not decorative. Built off the
- * site root rather than `location.pathname` verbatim — however this
- * particular visitor arrived (a bookmark to /index.html, a trailing
- * slash-less link, whatever), the shared link should be the one clean
- * canonical URL, not a mirror of however they got here. */
+/** Every share carries a link back to the site — Classic/Unlimited get the
+ * bare site root, Custom gets a functional challenge link
+ * (?start=XX&dest=YY, see tryStartChallengeFromUrl()) that drops a friend
+ * straight into the same matchup. Built off the site root rather than
+ * `location.pathname` verbatim — however this particular visitor arrived
+ * (a bookmark to /index.html, a trailing slash-less link, whatever), the
+ * shared link should be the one clean canonical URL, not a mirror of
+ * however they got here. */
 function shareUrlFor() {
-  if (mode !== "custom") return null;
-  return `${location.origin}/?start=${activeGame.startCode}&dest=${activeGame.destCode}`;
+  const base = `${location.origin}/`;
+  if (mode !== "custom") return base;
+  return `${base}?start=${activeGame.startCode}&dest=${activeGame.destCode}`;
 }
 
 els.shareBtn.addEventListener("click", async () => {

@@ -64,11 +64,46 @@ export class RouteMap {
     return [lat, lon];
   }
 
+  /** Unwraps `lon` by ±360 relative to `anchorLon` if needed, so a pair of
+   * points spans the short way across the antimeridian instead of
+   * numerically interpolating the long way through the Prime Meridian. A
+   * handful of Pacific-island entries in data.js (Tonga, Samoa) are stored
+   * as negative longitude right next to positive-longitude neighbors just
+   * across 180°, which without this reads as ~300° of separation instead
+   * of the real ~60°. */
+  _unwrapLon(lon, anchorLon) {
+    let adjusted = lon;
+    while (adjusted - anchorLon > 180) adjusted -= 360;
+    while (adjusted - anchorLon < -180) adjusted += 360;
+    return adjusted;
+  }
+
+  /** Every marker and line segment for one route needs to agree on which
+   * "copy" of the world each stop lands in — unwrapping pairs independently
+   * would still leave a marker and the line segment touching it pointing at
+   * different copies whenever the route zigzags across the antimeridian
+   * more than once. Unwraps every stop's longitude relative to the start
+   * (index 0, always present) so the whole route stays in one consistent
+   * copy. Nullable slots stay null. */
+  _unwrappedSequence(sequence) {
+    const [, startLon] = this._latLng(sequence[0]);
+    return sequence.map((code) => {
+      if (code == null) return null;
+      const [lat, lon] = this._latLng(code);
+      return [lat, this._unwrapLon(lon, startLon)];
+    });
+  }
+
   /** Frames the start/destination pair. Call once per new game — the
    * player is free to pan/zoom on their own after that. */
   frame(startCode, destCode) {
     const L = window.L;
-    const bounds = L.latLngBounds([this._latLng(startCode), this._latLng(destCode)]);
+    const [startLat, startLon] = this._latLng(startCode);
+    const [destLat, destLon] = this._latLng(destCode);
+    const bounds = L.latLngBounds([
+      [startLat, startLon],
+      [destLat, this._unwrapLon(destLon, startLon)],
+    ]);
     this.map.flyToBounds(bounds, { padding: [60, 60], maxZoom: 5, duration: 0.6 });
   }
 
@@ -83,6 +118,7 @@ export class RouteMap {
     this.markerLayer.clearLayers();
 
     const sequence = game.displaySequence(); // [start, ...slots(nullable), dest]
+    const coords = this._unwrappedSequence(sequence);
     const won = game.status === "won";
 
     sequence.forEach((code, i) => {
@@ -96,7 +132,7 @@ export class RouteMap {
           ? ICONS.destReached
           : ICONS.destPending
         : ICONS.visited;
-      L.marker(this._latLng(code), { icon, keyboard: false })
+      L.marker(coords[i], { icon, keyboard: false })
         .bindTooltip(game.countryName(code), { direction: "top", offset: [0, -6] })
         .addTo(this.markerLayer);
     });
@@ -106,17 +142,18 @@ export class RouteMap {
     // undiscovered slot in between breaks the line rather than implying
     // two non-adjacent finds are directly connected.
     for (let i = 0; i < sequence.length - 1; i++) {
-      const a = sequence[i];
-      const b = sequence[i + 1];
-      if (a == null || b == null) continue;
-      L.polyline([this._latLng(a), this._latLng(b)], {
+      if (sequence[i] == null || sequence[i + 1] == null) continue;
+      L.polyline([coords[i], coords[i + 1]], {
         color: "#d9a441",
         weight: 3,
         opacity: 0.9,
       }).addTo(this.lineLayer);
     }
 
-    if (focusCode != null) this.map.panTo(this._latLng(focusCode), { animate: true, duration: 0.5 });
+    if (focusCode != null) {
+      const focusLatLng = coords[sequence.indexOf(focusCode)];
+      this.map.panTo(focusLatLng, { animate: true, duration: 0.5 });
+    }
   }
 
   /** Same picture as render() for a just-won game, but reveals each
@@ -133,18 +170,17 @@ export class RouteMap {
     this.markerLayer.clearLayers();
 
     const sequence = game.displaySequence();
+    const coords = this._unwrappedSequence(sequence);
     sequence.forEach((code, i) => {
       const icon = i === 0 ? ICONS.start : i === sequence.length - 1 ? ICONS.destReached : ICONS.visited;
-      L.marker(this._latLng(code), { icon, keyboard: false })
+      L.marker(coords[i], { icon, keyboard: false })
         .bindTooltip(game.countryName(code), { direction: "top", offset: [0, -6] })
         .addTo(this.markerLayer);
     });
 
     for (let i = 0; i < sequence.length - 1; i++) {
-      const a = sequence[i];
-      const b = sequence[i + 1];
       const id = setTimeout(() => {
-        L.polyline([this._latLng(a), this._latLng(b)], {
+        L.polyline([coords[i], coords[i + 1]], {
           color: "#d9a441",
           weight: 3,
           opacity: 0.9,

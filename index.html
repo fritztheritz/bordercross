@@ -338,9 +338,29 @@
     const hadServiceWorkerController = !!navigator.serviceWorker?.controller;
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", () => {
-        navigator.serviceWorker.register("sw.js").catch(() => {
-          // Offline support just won't be available — the game still works online.
-        });
+        navigator.serviceWorker
+          .register("sw.js")
+          .then((registration) => {
+            // register() only checks for a new sw.js once, on this load — fine
+            // for a browser tab you reopen fresh, but an installed PWA is
+            // usually *resumed* from the background (the OS suspends it
+            // rather than closing it), so that one check from days ago never
+            // re-runs on its own and the update toast below never gets a
+            // reason to fire. Re-check every time the app comes back to the
+            // foreground instead, plus a periodic backstop for a tab that's
+            // simply left open and visible for a long stretch.
+            const checkForUpdate = () => registration.update().catch(() => {});
+            document.addEventListener("visibilitychange", () => {
+              if (document.visibilityState === "visible") checkForUpdate();
+            });
+            window.addEventListener("pageshow", checkForUpdate);
+            setInterval(() => {
+              if (document.visibilityState === "visible") checkForUpdate();
+            }, 30 * 60 * 1000);
+          })
+          .catch(() => {
+            // Offline support just won't be available — the game still works online.
+          });
       });
       // sw.js calls skipWaiting()+clients.claim(), so a new version takes
       // over immediately rather than waiting for every tab to close — but

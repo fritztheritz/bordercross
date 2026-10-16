@@ -69,9 +69,13 @@ const els = {
   restrictionsBanner: document.getElementById("restrictionsBanner"),
   restrictionsList: document.getElementById("restrictionsList"),
   mapContainer: document.getElementById("mapContainer"),
+  mapRecenterBtn: document.getElementById("mapRecenterBtn"),
   modeClassicBtn: document.getElementById("modeClassicBtn"),
   modeUnlimitedBtn: document.getElementById("modeUnlimitedBtn"),
   modeCustomBtn: document.getElementById("modeCustomBtn"),
+  optionsMenu: document.getElementById("optionsMenu"),
+  optionsMenuBtn: document.getElementById("optionsMenuBtn"),
+  optionsMenuPanel: document.getElementById("optionsMenuPanel"),
   difficultyPicker: document.getElementById("difficultyPicker"),
   restrictionsPicker: document.getElementById("restrictionsPicker"),
   regionPicker: document.getElementById("regionPicker"),
@@ -407,6 +411,39 @@ els.regionPicker.addEventListener("change", () => {
   } catch {}
 });
 
+// The three Unlimited-only pickers (difficulty/restrictions/region) live
+// inside a single popover behind one button instead of three always-visible
+// dropdowns — keeps the topbar from having to fit three selects plus New
+// Game on one row. `els.optionsMenu` is the whole wrapper (hidden outside
+// Unlimited); `els.optionsMenuPanel` is just the popover's open/closed state.
+function closeOptionsMenu() {
+  els.optionsMenuPanel.hidden = true;
+  els.optionsMenuBtn.setAttribute("aria-expanded", "false");
+}
+
+function setOptionsMenuAvailable(available) {
+  els.optionsMenu.hidden = !available;
+  if (!available) closeOptionsMenu();
+}
+
+els.optionsMenuBtn.addEventListener("click", () => {
+  const opening = els.optionsMenuPanel.hidden;
+  els.optionsMenuPanel.hidden = !opening;
+  els.optionsMenuBtn.setAttribute("aria-expanded", String(opening));
+});
+
+document.addEventListener("click", (e) => {
+  if (!els.optionsMenuPanel.hidden && !els.optionsMenu.contains(e.target)) closeOptionsMenu();
+});
+
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && !els.optionsMenuPanel.hidden) closeOptionsMenu();
+});
+
+els.mapRecenterBtn.addEventListener("click", () => {
+  map.frame(activeGame.startCode, activeGame.destCode);
+});
+
 /** Country-code pool for Unlimited's region filter, or null for "any" —
  * randomPair() treats null the same as no filter at all. */
 function unlimitedRegionCodes() {
@@ -631,9 +668,7 @@ function setMode(next) {
   els.modeClassicBtn.setAttribute("aria-pressed", String(mode === "classic"));
   els.modeUnlimitedBtn.setAttribute("aria-pressed", String(mode === "unlimited"));
   els.modeCustomBtn.setAttribute("aria-pressed", String(mode === "custom"));
-  els.difficultyPicker.hidden = mode !== "unlimited";
-  els.restrictionsPicker.hidden = mode !== "unlimited";
-  els.regionPicker.hidden = mode !== "unlimited";
+  setOptionsMenuAvailable(mode === "unlimited");
 
   syncNewGameButton();
 
@@ -862,7 +897,7 @@ function submitMove(rawValue) {
   renderFeedback(els, message, "ok", tag);
   renderRouteChain(els, activeGame);
   syncHintBtn();
-  map.render(activeGame);
+  map.render(activeGame, result.code);
   if (mode === "classic") persistDaily();
 }
 
@@ -992,9 +1027,7 @@ function activateCustomGame(startCode, destCode) {
   els.modeClassicBtn.setAttribute("aria-pressed", "false");
   els.modeUnlimitedBtn.setAttribute("aria-pressed", "false");
   els.modeCustomBtn.setAttribute("aria-pressed", "true");
-  els.difficultyPicker.hidden = true;
-  els.restrictionsPicker.hidden = true;
-  els.regionPicker.hidden = true;
+  setOptionsMenuAvailable(false);
   syncNewGameButton();
 }
 

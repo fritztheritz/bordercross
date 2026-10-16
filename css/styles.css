@@ -182,6 +182,30 @@ button {
 
 .difficulty-picker:hover { border-color: var(--accent); }
 
+/* Unlimited's three dropdowns (difficulty/restrictions/region) live behind
+   one ⚙ button instead of sitting inline — keeps the topbar from having to
+   fit three selects plus New Game on the same row. */
+.options-menu { position: relative; }
+
+.options-menu-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--surface-raised);
+  border: 1px solid var(--hairline-strong);
+  border-radius: 12px;
+  padding: 10px;
+  box-shadow: var(--shadow);
+  z-index: 40;
+  min-width: 190px;
+}
+
+.options-menu-panel[hidden] { display: none; }
+.options-menu-panel .difficulty-picker { width: 100%; }
+
 .icon-btn {
   border: 1px solid var(--hairline-strong);
   background: var(--surface);
@@ -329,6 +353,14 @@ button:focus-visible, input:focus-visible, .suggestion-item:focus-visible {
   transform: rotate(-3deg);
 }
 
+/* A single small meta row (daily number + players-today) sits above the
+   move count, which stays the one visual anchor in the stamp. */
+.stamp-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .daily-number {
   font-size: 10.5px;
   font-weight: 600;
@@ -347,8 +379,8 @@ button:focus-visible, input:focus-visible, .suggestion-item:focus-visible {
 
 .stamp-moves {
   font-family: "IBM Plex Mono", monospace;
-  font-weight: 600;
-  font-size: 13px;
+  font-weight: 700;
+  font-size: 14.5px;
   white-space: nowrap;
   border: 2px solid currentColor;
   border-radius: 8px;
@@ -397,14 +429,8 @@ button:focus-visible, input:focus-visible, .suggestion-item:focus-visible {
   .topbar { gap: 14px; padding-bottom: 14px; }
   .topbar-controls { flex-direction: column; align-items: stretch; width: 100%; gap: 10px; }
   .mode-toggle button { flex: 1; }
-  /* Unlimited can show up to three dropdowns (difficulty/restrictions/
-     region) plus New Game at once — on a narrow screen that's too much
-     for one unbroken row, so it wraps: dropdowns flow two-ish per line,
-     and New Game always gets its own full-width row as a clear, large
-     tap target rather than fighting them for space. */
   .primary-actions { flex-wrap: wrap; width: 100%; }
   .primary-actions #newGameBtn { flex: 1 1 100%; }
-  .difficulty-picker { flex: 1 1 130px; min-width: 0; }
   .icon-buttons { justify-content: space-between; }
   .icon-btn { width: 42px; height: 42px; }
 }
@@ -645,8 +671,13 @@ button:focus-visible, input:focus-visible, .suggestion-item:focus-visible {
   margin-top: 12px;
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
+  align-items: flex-start;
   gap: 6px;
+  /* A hard route can rack up a lot of ruled-out guesses — cap the growth
+     at a few rows and scroll instead of pushing the map panel further and
+     further down the page. */
+  max-height: 84px;
+  overflow-y: auto;
 }
 
 .wrong-guesses:empty { display: none; }
@@ -674,7 +705,15 @@ button:focus-visible, input:focus-visible, .suggestion-item:focus-visible {
 
 /* ---------- Map panel ---------- */
 
-.map-panel { padding: 12px; }
+.map-panel { padding: 12px; position: relative; }
+
+.map-recenter-btn {
+  position: absolute;
+  top: 24px;
+  right: 24px;
+  z-index: 20;
+  box-shadow: var(--shadow);
+}
 
 .map-svg {
   width: 100%;
@@ -851,7 +890,27 @@ button:focus-visible, input:focus-visible, .suggestion-item:focus-visible {
 .rule-block.land { border-color: var(--ok); }
 .rule-block.sea { border-color: var(--teal); }
 
-.rule-title { font-weight: 800; margin-bottom: 4px; }
+/* rule-block sections are <details> — collapsed by default so "How to
+   Play" is skimmable instead of a wall of text read top to bottom. */
+.rule-title {
+  font-weight: 800;
+  margin-bottom: 4px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.rule-title::-webkit-details-marker { display: none; }
+
+.rule-title::before {
+  content: "▸";
+  display: inline-block;
+  width: 1em;
+  color: var(--text-muted);
+  transition: transform 0.15s ease;
+}
+
+.rule-block[open] > .rule-title::before { transform: rotate(90deg); }
+.rule-block > p { margin-top: 8px; }
 
 /* Stats grid */
 

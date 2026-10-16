@@ -49,20 +49,34 @@
           <button type="button" id="modeCustomBtn" aria-pressed="false">Custom</button>
         </div>
         <div class="primary-actions">
-          <select id="difficultyPicker" class="difficulty-picker" aria-label="Unlimited mode difficulty" hidden>
-            <option value="any">Any difficulty</option>
-            <option value="easy">Easy</option>
-            <option value="medium">Medium</option>
-            <option value="hard">Hard</option>
-          </select>
-          <select id="restrictionsPicker" class="difficulty-picker" aria-label="Unlimited mode restrictions" hidden>
-            <option value="random">Restrictions: Random</option>
-            <option value="off">Restrictions: Off</option>
-            <option value="on">Restrictions: On</option>
-          </select>
-          <select id="regionPicker" class="difficulty-picker" aria-label="Unlimited mode region" hidden>
-            <option value="any">Any region</option>
-          </select>
+          <div class="options-menu" id="optionsMenu" hidden>
+            <button
+              type="button"
+              class="icon-btn"
+              id="optionsMenuBtn"
+              title="Unlimited options"
+              aria-label="Unlimited mode options"
+              aria-haspopup="true"
+              aria-expanded="false"
+              aria-controls="optionsMenuPanel"
+            >⚙</button>
+            <div class="options-menu-panel" id="optionsMenuPanel" hidden>
+              <select id="difficultyPicker" class="difficulty-picker" aria-label="Unlimited mode difficulty">
+                <option value="any">Any difficulty</option>
+                <option value="easy">Easy</option>
+                <option value="medium">Medium</option>
+                <option value="hard">Hard</option>
+              </select>
+              <select id="restrictionsPicker" class="difficulty-picker" aria-label="Unlimited mode restrictions">
+                <option value="random">Restrictions: Random</option>
+                <option value="off">Restrictions: Off</option>
+                <option value="on">Restrictions: On</option>
+              </select>
+              <select id="regionPicker" class="difficulty-picker" aria-label="Unlimited mode region">
+                <option value="any">Any region</option>
+              </select>
+            </div>
+          </div>
           <button type="button" class="btn btn-primary" id="newGameBtn">New Game</button>
         </div>
         <div class="icon-buttons">
@@ -82,10 +96,12 @@
       </div>
       <div class="perforation" aria-hidden="true"></div>
       <div class="stamp">
-        <span class="daily-number mono" id="dailyNumber" hidden></span>
+        <div class="stamp-meta">
+          <span class="daily-number mono" id="dailyNumber" hidden></span>
+          <span class="players-today" id="playersToday" hidden></span>
+        </div>
         <span class="stamp-moves mono" id="optimalMovesText">— moves possible</span>
         <span class="difficulty-badge" id="difficultyBadge"></span>
-        <span class="players-today" id="playersToday" hidden></span>
       </div>
       <div class="perforation" aria-hidden="true"></div>
       <div class="stub dest">
@@ -137,6 +153,7 @@
 
       <div class="panel map-panel">
         <div class="map-svg" id="mapContainer" role="img" aria-label="Route map — pan and zoom to explore"></div>
+        <button type="button" class="icon-btn map-recenter-btn" id="mapRecenterBtn" title="Recenter map" aria-label="Recenter map on start and destination">⟲</button>
         <p class="map-caption">
           Drag to pan, scroll or pinch to zoom. Pins mark countries you've confirmed — gold lines connect
           confirmed finds that sit next to each other in the route. This basemap has no political borders on
@@ -155,32 +172,32 @@
       <p>You can guess them in <strong>any order</strong> — for a Canada → Guatemala run, naming "Mexico" before "United States" is just as valid as the reverse. Each correct guess slots into its right position automatically, so the route always displays in order even though you found it out of order. You never need to type the destination yourself — the moment every step in between is found, the route completes on its own.</p>
       <p>Your goal is to find the route using the <strong>fewest possible guesses</strong> — a guess that isn't on the shortest route at all counts against you just like an extra move would, so it pays to think before typing. (Retyping your own start, the destination before it's reachable, or a step you've already found doesn't cost anything — those aren't real guesses about the route.)</p>
 
-      <div class="rule-block land">
-        <div class="rule-title">What counts as "on the route"</div>
+      <details class="rule-block land">
+        <summary class="rule-title">What counts as "on the route"</summary>
         <p class="muted">A country qualifies if it lies on at least one shortest path between the start and destination — determined the same way a map app finds directions: by the network of land borders and sea crossings below, not by straight-line distance.</p>
-      </div>
-      <div class="rule-block land">
-        <div class="rule-title">Land connections</div>
+      </details>
+      <details class="rule-block land">
+        <summary class="rule-title">Land connections</summary>
         <p class="muted">Two countries are connected whenever they share a land border — Canada–United States, United States–Mexico, and so on.</p>
-      </div>
-      <div class="rule-block sea">
-        <div class="rule-title">Sea connections</div>
+      </details>
+      <details class="rule-block sea">
+        <summary class="rule-title">Sea connections</summary>
         <p class="muted">Countries that don't share a land border can still be connected across a short, well-known sea crossing or strait — the UK and France across the Channel, Spain and Morocco across Gibraltar, Russia and the United States across the Bering Strait. A handful of longer "gateway" links (Iceland–UK, Australia–New Zealand) are included too, since those nations would otherwise have no route to the rest of the world at all. This list is fixed and curated, not "anything nearby" — see the project README for the full rule and the complete list.</p>
-      </div>
+      </details>
 
       <p>The map on the right is a real, pannable, zoomable basemap — deliberately without political borders drawn on it, so it can't hint at what's adjacent to what.</p>
       <p>The optimal number of steps is shown before you start, but the countries themselves never are, until you find them (or <strong>Give Up</strong> to reveal the route).</p>
       <p class="muted">A hint targets the earliest still-unfound step and gets more specific each time you ask again for that same step: first the region it's in (e.g. "Southeast Asia"), then the country name's first letter, then each letter after that. It costs a move, same as a wrong guess — no extra penalty beyond that. Any country you guess that turns out to be wrong stays listed under "Ruled out" so you don't waste a second guess on it.</p>
 
-      <div class="rule-block sea">
-        <div class="rule-title">Restrictions</div>
-        <p class="muted">Some short-to-medium runs in Classic and Unlimited come with one or two countries banned from the route entirely — shown up front as "🚫 Off-limits for this route," never a surprise. The optimal route already routes around them, so the move count and every hint account for the detour. Restrictions are chosen from countries that actually sat on the direct route, so they always force a real reroute rather than banning somewhere irrelevant — and only on routes short enough that the detour is something you can actually reason about, not a random blocker dropped on an already-sprawling path. In Unlimited, the dropdown next to the difficulty picker lets you force restrictions on or off instead of leaving it to the usual chance.</p>
-      </div>
+      <details class="rule-block sea">
+        <summary class="rule-title">Restrictions</summary>
+        <p class="muted">Some short-to-medium runs in Classic and Unlimited come with one or two countries banned from the route entirely — shown up front as "🚫 Off-limits for this route," never a surprise. The optimal route already routes around them, so the move count and every hint account for the detour. Restrictions are chosen from countries that actually sat on the direct route, so they always force a real reroute rather than banning somewhere irrelevant — and only on routes short enough that the detour is something you can actually reason about, not a random blocker dropped on an already-sprawling path. In Unlimited, the ⚙ options button next to New Game lets you force restrictions on or off instead of leaving it to the usual chance.</p>
+      </details>
 
-      <div class="rule-block land">
-        <div class="rule-title">Game modes</div>
-        <p class="muted"><strong>Classic</strong> is a daily challenge — one fixed start/destination pair, the same for everyone, that refreshes at midnight in your local timezone. If you miss a day, a banner offers to let you play it before today's, so a busy day doesn't have to break your streak. <strong>Unlimited</strong> generates a fresh random pair every time you press New Game, and lets you pick a target difficulty, whether restrictions apply, and a region to draw from, all from the dropdowns next to the mode switcher. <strong>Custom</strong> lets you pick both countries yourself — Custom runs never have restrictions, since you're already choosing the challenge, and sharing one gives a friend a link straight into the same pair.</p>
-      </div>
+      <details class="rule-block land">
+        <summary class="rule-title">Game modes</summary>
+        <p class="muted"><strong>Classic</strong> is a daily challenge — one fixed start/destination pair, the same for everyone, that refreshes at midnight in your local timezone. If you miss a day, a banner offers to let you play it before today's, so a busy day doesn't have to break your streak. <strong>Unlimited</strong> generates a fresh random pair every time you press New Game, and lets you pick a target difficulty, whether restrictions apply, and a region to draw from, all from the ⚙ options button next to the mode switcher. <strong>Custom</strong> lets you pick both countries yourself — Custom runs never have restrictions, since you're already choosing the challenge, and sharing one gives a friend a link straight into the same pair.</p>
+      </details>
       <p class="muted">After finishing a run, <strong>Share Result</strong> copies (or opens your share sheet with) a spoiler-free summary — flags, move count, and a row of squares, no country names — so you can compare with friends over text. A checkbox on the result modal swaps in colorblind-friendly squares if the default green/yellow pair is hard to tell apart.</p>
       <p class="muted">The 🏅 icon in the top bar tracks <strong>Achievements</strong> — small milestones unlocked from your stats and streak, like completing a Hard route with no hints or reaching a 7-day streak.</p>
     </div>

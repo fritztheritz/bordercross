@@ -37,11 +37,11 @@ export class RouteMap {
     this.map = L.map(container, {
       worldCopyJump: true,
       minZoom: 1,
-      maxZoom: 7,
+      maxZoom: 8, // matches the tile service's actual deepest LOD — see TILE_URL's ?f=json metadata
       zoomSnap: 0.5,
     }).setView([15, 10], 2);
 
-    L.tileLayer(TILE_URL, { maxZoom: 7, attribution: TILE_ATTRIBUTION }).addTo(this.map);
+    L.tileLayer(TILE_URL, { maxZoom: 8, attribution: TILE_ATTRIBUTION }).addTo(this.map);
 
     this.lineLayer = L.layerGroup().addTo(this.map);
     this.markerLayer = L.layerGroup().addTo(this.map);
@@ -72,8 +72,11 @@ export class RouteMap {
     this.map.flyToBounds(bounds, { padding: [60, 60], maxZoom: 5, duration: 0.6 });
   }
 
-  /** Redraws markers + confirmed route segments from the current game state. */
-  render(game) {
+  /** Redraws markers + confirmed route segments from the current game state.
+   * `focusCode`, if given, is gently panned to (no zoom change) — used after
+   * a correct guess so a find off in a direction the player had panned away
+   * from doesn't go unnoticed. */
+  render(game, focusCode) {
     const L = window.L;
     this._clearPendingTimeouts();
     this.lineLayer.clearLayers();
@@ -112,6 +115,8 @@ export class RouteMap {
         opacity: 0.9,
       }).addTo(this.lineLayer);
     }
+
+    if (focusCode != null) this.map.panTo(this._latLng(focusCode), { animate: true, duration: 0.5 });
   }
 
   /** Same picture as render() for a just-won game, but reveals each
